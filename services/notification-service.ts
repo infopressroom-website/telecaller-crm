@@ -2,6 +2,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import type { AuthUser } from "@/lib/auth/rbac";
+import { notifyUser, RealtimeEvents } from "@/lib/pusher-server";
 
 export type NotifyInput = { userId: string; title: string; body?: string; link?: string; dedupeKey?: string };
 
@@ -12,9 +13,19 @@ export type NotifyInput = { userId: string; title: string; body?: string; link?:
  */
 export async function notify(n: NotifyInput): Promise<boolean> {
   try {
-    await db.notification.create({
+    const notification = await db.notification.create({
       data: { userId: n.userId, title: n.title.slice(0, 200), body: n.body?.slice(0, 1000) ?? null, link: n.link ?? null, dedupeKey: n.dedupeKey ?? null, channel: "IN_APP", status: "SENT" },
     });
+    
+    // Trigger real-time notification (gracefully fails if Pusher not configured)
+    await notifyUser(n.userId, RealtimeEvents.NOTIFICATION_CREATED, {
+      id: notification.id,
+      title: notification.title,
+      body: notification.body,
+      link: notification.link,
+      createdAt: notification.createdAt.toISOString(),
+    });
+    
     return true;
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return false;

@@ -53,6 +53,8 @@ const envSchema = z.object({
   PUSHER_KEY: z.string().optional().or(z.literal("")),
   PUSHER_SECRET: z.string().optional().or(z.literal("")),
   PUSHER_CLUSTER: z.string().optional().or(z.literal("")),
+  NEXT_PUBLIC_PUSHER_KEY: z.string().optional().or(z.literal("")),
+  NEXT_PUBLIC_PUSHER_CLUSTER: z.string().optional().or(z.literal("")),
   
   // Optional: Email (Resend)
   RESEND_API_KEY: z.string().optional().or(z.literal("")),
@@ -145,6 +147,7 @@ export const features = {
   ai: Boolean(env.ANTHROPIC_API_KEY),
   storage: Boolean(env.STORAGE_BUCKET),
   automation: Boolean(env.CRON_SECRET),
+  pusher: Boolean(env.PUSHER_APP_ID && env.PUSHER_KEY && env.PUSHER_SECRET && env.PUSHER_CLUSTER),
 } as const;
 
 /**
@@ -161,4 +164,5 @@ if (isDevelopment) {
   console.log(`     - AI: ${features.ai ? "✓" : "✗"}`);
   console.log(`     - Storage: ${features.storage ? "✓" : "✗"}`);
   console.log(`     - Automation: ${features.automation ? "✓" : "✗"}`);
+  console.log(`     - Pusher: ${features.pusher ? "✓" : "✗"}`);
 }

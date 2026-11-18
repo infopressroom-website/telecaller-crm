@@ -5,6 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { isRedisAvailable } from "@/lib/redis";
+import { isPusherAvailable } from "@/lib/pusher-server";
 import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export async function GET() {
     services: {
       database: dbStatus,
       redis: isRedisAvailable() ? "connected" : "unavailable",
+      pusher: isPusherAvailable() ? "connected" : "unavailable",
     },
     responseTime: `${responseTime}ms`,
   });
