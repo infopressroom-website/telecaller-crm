@@ -1,0 +1,27 @@
+{
+  "id": "FEAT-001",
+  "type": "fix",
+  "description": "Fix critical TypeScript compilation errors and rate limiting API signature mismatch blocking the build. 22 TypeScript errors found blocking npm run typecheck.",
+  "status": "pending",
+  "steps": [
+    "Fix lib/rate-limit.ts signature: Change rateLimit(token, limit, window) to match actual usage rateLimit(options?) returning { check(limit, token) }. The function currently returns { check(limit, token) } but is called with 3 positional args in app/actions/auth.ts lines 25-27, 44.",
+    "Update app/actions/auth.ts lines 25-27 and 44 to use new signature: const limiter = rateLimit({ interval: 600000, uniqueTokenPerInterval: 500 }); const result = limiter.check(30, `login:ip:${ip}`); if (!result.success) return error.",
+    "Fix tests/phases-9-12.test.ts lines 9, 185-190: Remove resetRateLimits import (does not exist), update rateLimit calls to use new API.",
+    "Fix tests/scope.test.ts lines 41-42: Change readonly array types to mutable in test fixtures: const scope: DataScope = { kind: 'TEAMS', userId: 'u1', teamIds: ['t1'] } (remove readonly from array).",
+    "Fix lib/env.ts line 134: Change comparison from env.TELEPHONY_PROVIDER !== '' to check for actual provider value or remove dead code comparing literal '\"exotel\"' to '\"\"'.",
+    "Fix prisma/seed-demo.ts line 86: Ensure teamId is never null when creating demo users with teams, add type assertion or filter.",
+    "Run npm run typecheck to verify all 22 TypeScript errors are resolved."
+  ],
+  "acceptance_criteria": [
+    "npm run typecheck passes with 0 errors",
+    "All rate limiting calls in auth actions use correct API signature",
+    "Tests compile without type errors",
+    "No regression in existing functionality"
+  ],
+  "verification": [
+    "cd d:\\telecaller-crm\\.worktrees\\full-audit && npm run typecheck 2>&1 | findstr /C:\"Found 0 errors\"",
+    "npm run test -- --run rate-limit to verify rate limit tests pass"
+  ],
+  "blocked_reason": null,
+  "findings": "TypeScript compilation completely blocked. Rate limit API mismatch in 8 locations. Seed script has type safety issue with nullable teamId. Environment validation has dead code comparison."
+}

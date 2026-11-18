@@ -1,0 +1,33 @@
+{
+  "id": "FEAT-001",
+  "type": "perf",
+  "description": "Add missing database indexes to prisma/schema.prisma for query optimization. Existing indexes cover basic queries but composite indexes are needed for dashboard, reports, and list views that filter on multiple columns. Add indexes for: Lead (status+priority+createdAt), CallLog (status+disposition+createdAt, leadId+disposition), FollowUp (dueAt+priority+status), User (status+roleId), LeadAssignment (toUserId+method+createdAt), Notification (userId+channel+status).",
+  "status": "pending",
+  "steps": [
+    "Read prisma/schema.prisma to understand existing indexes (already has many single-column and two-column indexes on lines 236-940)",
+    "Add composite indexes to Lead model: @@index([status, priority, createdAt(sort: Desc)]) for filtered lead lists with priority sorting, @@index([city, state]) for location-based distribution queries",
+    "Add composite indexes to CallLog model: @@index([status, dispositionId, createdAt(sort: Desc)]) for call reports filtered by outcome, @@index([leadId, dispositionId]) for lead call history analysis",
+    "Add composite indexes to FollowUp model: @@index([dueAt, priority, status]) for prioritized follow-up queues",
+    "Add composite indexes to User model: @@index([status, roleId]) for active user listings by role, @@index([assignmentPaused, status]) for distribution eligibility checks",
+    "Add composite indexes to LeadAssignment model: @@index([toUserId, method, createdAt]) for assignment history by method",
+    "Add composite indexes to Notification model: @@index([userId, channel, status, createdAt(sort: Desc)]) for notification inbox queries",
+    "Add composite index to ImportBatch model: @@index([status, createdAt(sort: Desc)]) for import queue monitoring",
+    "Run npx prisma migrate dev --name add-composite-indexes to generate migration",
+    "Verify migration file created in prisma/migrations/"
+  ],
+  "acceptance_criteria": [
+    "All new indexes added to prisma/schema.prisma without breaking existing schema",
+    "Migration file generated successfully with no errors",
+    "npx prisma migrate dev completes without errors",
+    "npx prisma validate passes",
+    "Database schema updated with new indexes visible in npx prisma studio"
+  ],
+  "verification": [
+    "npx prisma validate - confirms schema is valid",
+    "npx prisma migrate dev --name add-composite-indexes - applies migration",
+    "npm run test - existing tests still pass",
+    "Verify migration file exists in prisma/migrations/ directory"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

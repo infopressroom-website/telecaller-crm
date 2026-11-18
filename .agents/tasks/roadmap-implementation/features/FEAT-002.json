@@ -1,0 +1,36 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Integrate Redis caching into existing services. lib/redis.ts and lib/cache.ts already exist with graceful fallback to in-memory LRU cache. Wire Redis into dashboard-service.ts (cache metrics for 2min), report-service.ts (cache report results for 5min), and lead-service.ts (cache lead counts for 1min). Update .env.example with Redis config. No new dependencies needed (ioredis already in package.json via lru-cache).",
+  "status": "pending",
+  "steps": [
+    "Verify Redis setup: check lib/redis.ts exports cacheGet/cacheSet/cacheDel/cacheDelPattern (already implemented with in-memory fallback), check lib/cache.ts wrapper exists",
+    "Update services/dashboard-service.ts: wrap getMetrics() with Redis cache using key 'dashboard:metrics:{userId}' TTL 120sec, wrap getRecentActivity() with key 'dashboard:activity:{userId}:{limit}' TTL 60sec. Import { cacheGet, cacheSet, cacheDel } from '@/lib/redis'.",
+    "Update services/report-service.ts: cache generateLeadReport results with key 'report:leads:{userId}:{hash-of-filters}' TTL 300sec, cache generateCallReport with key 'report:calls:{userId}:{hash}' TTL 300sec. Invalidate on data changes.",
+    "Update services/lead-service.ts: cache getLeadCounts() with key 'leads:counts:{userId}' TTL 60sec, invalidate cache in createLead/updateLead/deleteLead by calling cacheDel('leads:counts:*')",
+    "Update services/call-service.ts: invalidate dashboard cache in completeCall() by calling cacheDelPattern('dashboard:*')",
+    "Add REDIS_URL to .env.example with comment explaining it's optional and falls back to in-memory cache",
+    "Update lib/env.ts to include REDIS_URL in envSchema (already present, verify it's correctly typed)",
+    "Add Redis availability check to app/api/health/route.ts: import { isRedisAvailable } from '@/lib/redis', add redis: isRedisAvailable() to response",
+    "Write unit tests in tests/cache.test.ts: test cacheGet/Set/Del, test fallback to memory when Redis unavailable",
+    "Update README.md to document Redis as optional dependency with graceful degradation"
+  ],
+  "acceptance_criteria": [
+    "Dashboard loads faster on second visit (metrics cached)",
+    "Report generation returns cached results when filters unchanged",
+    "Redis connection failures don't break the application (falls back to memory)",
+    "Cache invalidation works: updating a lead refreshes dashboard counts",
+    "Health check endpoint shows Redis status",
+    "All existing tests pass with Redis both enabled and disabled"
+  ],
+  "verification": [
+    "npm run test - unit tests pass",
+    "Start app with REDIS_URL empty - verify graceful fallback to memory cache",
+    "Start app with valid REDIS_URL - verify Redis connection in console logs",
+    "Visit /dashboard twice - second load should be faster (check network tab timing)",
+    "Create a lead - verify dashboard counts update (cache invalidated)",
+    "curl http://localhost:3000/api/health - verify redis status in response"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

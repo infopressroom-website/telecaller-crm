@@ -48,6 +48,16 @@ const envSchema = z.object({
   ANTHROPIC_API_KEY: z.string().optional().or(z.literal("")),
   AI_MODEL: z.string().optional().or(z.literal("")),
 
+  // Optional: Pusher (Real-time)
+  PUSHER_APP_ID: z.string().optional().or(z.literal("")),
+  PUSHER_KEY: z.string().optional().or(z.literal("")),
+  PUSHER_SECRET: z.string().optional().or(z.literal("")),
+  PUSHER_CLUSTER: z.string().optional().or(z.literal("")),
+  
+  // Optional: Email (Resend)
+  RESEND_API_KEY: z.string().optional().or(z.literal("")),
+  EMAIL_FROM: z.string().optional().or(z.literal("")),
+
   // Logging
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
 });

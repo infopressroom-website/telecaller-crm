@@ -1,0 +1,33 @@
+{
+  "id": "FEAT-002",
+  "type": "fix",
+  "description": "Fix security vulnerabilities: 32 npm audit findings (3 Critical, 22 High, 7 Moderate) including Next.js CVE, deprecated packages, and implement missing security headers.",
+  "status": "pending",
+  "steps": [
+    "Review npm audit output for the 32 vulnerabilities, focusing on Critical (Next.js 14.2.15) and High severity issues.",
+    "Update package.json dependencies: next@14.2.15 → latest 14.x or 15.x stable (check breaking changes), eslint@8.57.1 → 9.x, recharts@2.13.0 → latest stable.",
+    "Run npm update to apply safe updates for transitive dependencies.",
+    "Add security headers in next.config.js or middleware: Content-Security-Policy, X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy: strict-origin-when-cross-origin, Permissions-Policy.",
+    "Add middleware.ts at root to set security headers on all responses.",
+    "Verify CSRF protection in server actions (Next.js 14 has built-in CSRF for server actions via origin check).",
+    "Add rate limiting middleware wrapper for API routes in lib/api.ts using existing rate-limit utility.",
+    "Document security headers in docs/SECURITY.md update.",
+    "Run npm audit to verify Critical and High vulnerabilities are resolved (acceptable: Moderate with documented mitigation).",
+    "Run npm run build to ensure no breaking changes from updates."
+  ],
+  "acceptance_criteria": [
+    "npm audit shows 0 Critical, 0 High vulnerabilities (Moderate acceptable with plan)",
+    "Security headers present in all responses (verify with curl or browser devtools)",
+    "Next.js updated to patched version without breaking changes",
+    "Rate limiting applied to sensitive API endpoints",
+    "All tests still pass after dependency updates"
+  ],
+  "verification": [
+    "npm audit --production",
+    "npm run build",
+    "npm run test",
+    "curl -I http://localhost:3000 | grep -E '(X-Frame-Options|X-Content-Type-Options|Referrer-Policy)' to verify headers after starting dev server"
+  ],
+  "blocked_reason": null,
+  "findings": "32 security vulnerabilities including Next.js CVE. No security headers configured. CSRF relies on Next.js built-in but not explicitly documented. Rate limiting exists but not applied to API routes. Deprecated packages: eslint@8, glob@7, recharts@2.x branches inactive."
+}

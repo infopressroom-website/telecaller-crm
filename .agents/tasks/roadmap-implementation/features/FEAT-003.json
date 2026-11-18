@@ -1,0 +1,37 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Wire Pusher real-time notifications into notification service and UI. lib/pusher-server.ts, lib/pusher-client.ts, and hooks/use-realtime.ts already exist. Services already call notify() but don't trigger Pusher events. Add Pusher triggers to notification-service.ts after creating notifications. Add real-time listener to app/(app)/notifications/page.tsx to auto-refresh notification list. Add env vars to .env.example. No new dependencies (pusher and pusher-js not in package.json - need to install).",
+  "status": "pending",
+  "steps": [
+    "Install Pusher dependencies: npm install pusher pusher-js",
+    "Add Pusher env vars to .env.example: PUSHER_APP_ID, PUSHER_KEY, PUSHER_SECRET, PUSHER_CLUSTER, NEXT_PUBLIC_PUSHER_KEY, NEXT_PUBLIC_PUSHER_CLUSTER with comments that these are optional",
+    "Update lib/env.ts validation schema: add PUSHER_APP_ID, PUSHER_KEY, PUSHER_SECRET, PUSHER_CLUSTER as optional strings, add NEXT_PUBLIC_PUSHER_KEY and NEXT_PUBLIC_PUSHER_CLUSTER to envSchema",
+    "Update services/notification-service.ts: after db.notification.create() in notify(), call await notifyUser(n.userId, RealtimeEvents.NOTIFICATION_CREATED, notification) from lib/pusher-server.ts. Import { notifyUser, RealtimeEvents } from '@/lib/pusher-server'.",
+    "Create app/api/pusher/auth/route.ts for Pusher private channel authentication following pattern in app/api/auth/me/route.ts for session validation, return authenticateUser(socketId, channel, userId) from lib/pusher-server.ts",
+    "Find notification list component (likely in app/(app)/notifications/page.tsx or features/notifications/), add 'use client' directive, import { useUserEvents } from '@/hooks/use-realtime', add useUserEvents(userId, { 'notification.created': (data) => { refetch(); toast.success(data.title); } })",
+    "Update components/app-shell.tsx or notification bell component to show real-time count updates: useUserEvents(userId, { 'notification.created': () => incrementUnreadCount() })",
+    "Create integration test in tests/integration/realtime.int.test.ts: test notification creation triggers Pusher event (mock Pusher client)",
+    "Add isPusherAvailable() check to app/api/health/route.ts",
+    "Document Pusher setup in README.md: sign up at pusher.com, get credentials, add to .env, graceful degradation when not configured"
+  ],
+  "acceptance_criteria": [
+    "When a notification is created, Pusher event is triggered (visible in Pusher dashboard if configured)",
+    "Notification list auto-updates when new notification arrives (no page refresh needed)",
+    "Notification bell shows real-time unread count",
+    "Application works normally when Pusher not configured (no errors, just no real-time updates)",
+    "Private channel authentication prevents unauthorized access",
+    "Toast appears for new notifications when user is on any page"
+  ],
+  "verification": [
+    "npm run test:all - all tests pass",
+    "Start app without Pusher config - verify no errors in console",
+    "Start app with Pusher config - verify Pusher connected in console",
+    "Open notifications page in two browser tabs logged in as different users",
+    "Create notification for user A via automation - verify it appears instantly in user A's tab only",
+    "Check Pusher dashboard for event count increase",
+    "curl http://localhost:3000/api/health - verify pusher status"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

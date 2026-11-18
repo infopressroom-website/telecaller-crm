@@ -1,0 +1,44 @@
+{
+  "id": "FEAT-005",
+  "type": "feat",
+  "description": "Create REST API endpoints for external integrations and mobile apps. Currently only Next.js internal API routes exist (app/api/auth/me, app/api/leads/import, etc). Create versioned REST API at app/api/v1/ with Bearer token authentication, rate limiting, standardized JSON responses, and endpoints for: leads (CRUD + list), calls (list + create), follow-ups (CRUD + list), notifications (list + mark read), users (me + list team). Reuse existing services, add API key management to User model.",
+  "status": "pending",
+  "steps": [
+    "Create API token system: add apiKey and apiKeyHash fields to User model in prisma/schema.prisma (optional strings), run migration",
+    "Create lib/api-auth.ts: export async function authenticateApiRequest(request: Request): Promise<AuthUser | null> that extracts Bearer token from Authorization header, validates against User.apiKeyHash, returns AuthUser or null. Use hashToken from lib/auth/session.ts for hashing.",
+    "Create lib/api-response.ts: export standardized response helpers: apiSuccess(data, status=200), apiError(message, status=400), apiValidationError(errors). Return NextResponse with consistent JSON structure: { success: true/false, data/error, timestamp }.",
+    "Create app/(app)/settings/api-tokens/page.tsx: UI to generate/revoke API tokens following pattern in app/(app)/settings/telephony/page.tsx. Show token once on creation (never again). List active tokens with created date and last used date. Button to revoke token.",
+    "Create app/api/v1/me/route.ts: GET endpoint returns current user profile. Use authenticateApiRequest() for auth. Apply rate limiting with rateLimit() from lib/rate-limit.ts.",
+    "Create app/api/v1/leads/route.ts: GET (list with pagination, filters), POST (create lead). Reuse getLeads() and createLead() from services/lead-service.ts. Validate input with Zod schemas from validations/. Apply rate limiting.",
+    "Create app/api/v1/leads/[id]/route.ts: GET (detail), PATCH (update), DELETE (soft delete). Reuse updateLead() and deleteLead() from services/lead-service.ts.",
+    "Create app/api/v1/calls/route.ts: GET (list), POST (start call). Reuse services/call-service.ts functions.",
+    "Create app/api/v1/follow-ups/route.ts: GET (list), POST (create). Reuse services/followup-service.ts.",
+    "Create app/api/v1/notifications/route.ts: GET (list), POST with action=mark_read. Reuse services/notification-service.ts.",
+    "Update app/api/health/route.ts to be public (no auth required) for uptime monitoring",
+    "Write API documentation in docs/API.md: authentication, rate limits, endpoints, request/response examples, error codes. Follow OpenAPI/Swagger structure.",
+    "Write integration tests in tests/integration/api.int.test.ts: test all endpoints with valid token, invalid token, missing token, rate limiting",
+    "Update README.md with API section: link to API docs, mention Bearer token auth"
+  ],
+  "acceptance_criteria": [
+    "API tokens can be generated and revoked via UI",
+    "All v1 endpoints require valid Bearer token (except /health)",
+    "Rate limiting prevents abuse (max 100 requests per minute per token)",
+    "Responses follow consistent JSON structure",
+    "All endpoints validate input and return clear error messages",
+    "API documentation complete with examples",
+    "Integration tests cover all endpoints and auth scenarios",
+    "Existing web app functionality unaffected"
+  ],
+  "verification": [
+    "npm run test:all - all tests including API integration tests pass",
+    "Visit /settings/api-tokens - generate token - copy token",
+    "curl http://localhost:3000/api/v1/me -H 'Authorization: Bearer TOKEN' - verify user profile returned",
+    "curl http://localhost:3000/api/v1/leads - verify 401 Unauthorized (no token)",
+    "curl http://localhost:3000/api/v1/leads -H 'Authorization: Bearer INVALID' - verify 401",
+    "curl http://localhost:3000/api/v1/leads -H 'Authorization: Bearer TOKEN' - verify lead list returned",
+    "Send 101 requests in 1 minute - verify rate limit error after 100",
+    "Revoke token in UI - verify subsequent API calls fail with 401"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

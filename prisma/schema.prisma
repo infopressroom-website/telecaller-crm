@@ -236,6 +236,8 @@ model User {
   @@index([roleId])
   @@index([teamId])
   @@index([status])
+  @@index([status, roleId])
+  @@index([assignmentPaused, status])
 }
 
 // Server-side sessions. Only a SHA-256 hash of the cookie token is stored.
@@ -363,6 +365,8 @@ model Lead {
   @@index([sourceId])
   @@index([status, createdAt])
   @@index([nextFollowUpAt])
+  @@index([status, priority, createdAt(sort: Desc)])
+  @@index([city, state])
 }
 
 // Append-only: every assignment/reassignment adds a row; nothing is overwritten.
@@ -387,6 +391,7 @@ model LeadAssignment {
   @@index([leadId, createdAt])
   @@index([toUserId, createdAt])
   @@index([createdAt])
+  @@index([toUserId, method, createdAt])
 }
 
 // ───────────── Calls ─────────────
@@ -437,6 +442,8 @@ model CallLog {
   @@index([agentId, startedAt])
   @@index([leadId, startedAt])
   @@index([status])
+  @@index([status, dispositionId, createdAt(sort: Desc)])
+  @@index([leadId, dispositionId])
 }
 
 // Metadata only — the audio lives in object storage.
@@ -471,6 +478,7 @@ model FollowUp {
   @@index([ownerId, status, dueAt])
   @@index([leadId])
   @@index([status, dueAt])
+  @@index([dueAt, priority, status])
 }
 
 model Task {
@@ -626,6 +634,7 @@ model Notification {
   createdAt  DateTime            @default(now())
 
   @@index([userId, status, createdAt])
+  @@index([userId, channel, status, createdAt(sort: Desc)])
 }
 
 // Append-only audit trail.
@@ -730,6 +739,7 @@ model ImportBatch {
   rows              ImportRow[]
 
   @@index([uploadedById, createdAt])
+  @@index([status, createdAt(sort: Desc)])
 }
 
 model ImportRow {

@@ -1,0 +1,43 @@
+{
+  "id": "FEAT-007",
+  "type": "chore",
+  "description": "Update environment configuration, finalize UI components, and update documentation. Add all new environment variables to .env.example with clear comments. Verify toast notifications work across all pages. Add API token management UI. Update README.md and IMPLEMENTATION_ROADMAP.md to reflect completed features. Create missing documentation for new features.",
+  "status": "pending",
+  "steps": [
+    "Review .env.example: ensure all new env vars added in previous FEATs are present with clear comments: REDIS_URL, PUSHER_*, RESEND_API_KEY, EMAIL_FROM, AWS_*, STORAGE_PROVIDER",
+    "Review lib/env.ts: ensure all new env vars properly validated in envSchema with correct types (string, url, enum) and .optional().or(z.literal('')) pattern for optional vars. Verify features object includes new features.",
+    "Verify components/ui/toast.tsx is properly integrated: check that ToastProvider wraps app in app/layout.tsx, test toast.success/error/warning/info from any page",
+    "Update app/(app)/settings/api-tokens/page.tsx (created in FEAT-005): polish UI, add copy-to-clipboard button for tokens, add last-used-at column, add confirmation dialog for revoke",
+    "Create components/realtime-status.tsx: indicator showing Pusher connection status (connected/disconnected/reconnecting) for debugging. Add to app shell header for admins only.",
+    "Update IMPLEMENTATION_ROADMAP.md: mark completed phases (2.1, 2.2, 3.1, 3.2, 4.1, 4.2, 5.1, 6.1) as COMPLETED. Update percentage complete from 85% to 95%. Remove 'In Progress' workflows section.",
+    "Update README.md: add Real-time Features section documenting Pusher integration, add API section with link to docs/API.md, update feature list to include REST API and S3 storage, update status table to 95% complete",
+    "Create docs/API.md: comprehensive API documentation with authentication, rate limits, all endpoints with request/response examples, error codes, SDKs/client examples in curl, JavaScript, Python",
+    "Create docs/REDIS.md: document Redis caching strategy, TTLs, cache keys, invalidation rules, performance impact, monitoring",
+    "Create docs/STORAGE.md: document S3 setup, local fallback, file types, retention policy, cleanup jobs, CORS configuration",
+    "Update docs/DEPLOYMENT_GUIDE.md: add sections for Redis setup (Redis Cloud, Upstash, self-hosted), Pusher setup, Resend setup, S3 setup with detailed steps",
+    "Run full verification: npm run verify (lint, typecheck, test, build). Fix any errors found.",
+    "Create CHANGELOG.md: document all new features added in this implementation with version 1.1.0 release notes"
+  ],
+  "acceptance_criteria": [
+    "All environment variables documented in .env.example",
+    "Toast notifications working on all pages",
+    "API token management UI complete and user-friendly",
+    "All documentation up to date and accurate",
+    "README reflects current feature set",
+    "Deployment guide covers all new services",
+    "Full verification passes (npm run verify)",
+    "CHANGELOG documents all changes"
+  ],
+  "verification": [
+    "npm run verify - all checks pass (typecheck, lint, test, build)",
+    "Review .env.example - all new vars present with helpful comments",
+    "Visit any page - trigger toast notification - verify it appears and auto-dismisses",
+    "Visit /settings/api-tokens - verify UI is polished and functional",
+    "Read through all updated documentation - verify accuracy and completeness",
+    "Follow deployment guide steps for one service (e.g., Pusher) - verify instructions work",
+    "Review CHANGELOG.md - verify all features documented",
+    "Check README.md feature list - verify all implemented features listed"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

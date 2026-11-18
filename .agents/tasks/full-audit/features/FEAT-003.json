@@ -1,0 +1,32 @@
+{
+  "id": "FEAT-003",
+  "type": "refactor",
+  "description": "Replace console.log/error/warn with structured logging throughout codebase (40+ occurrences), implement proper error tracking, and add log levels for production.",
+  "status": "pending",
+  "steps": [
+    "Audit existing lib/logger.ts - it has a basic structured logger with redaction but is not used consistently.",
+    "Update lib/logger.ts to export convenient log(), error(), warn(), info() functions wrapping the existing log() implementation.",
+    "Replace console.error in all app/actions/*.ts files (12 files) with logger.error() from lib/logger.ts, preserving error context.",
+    "Replace console.error in services/*.ts (automation-service.ts line 183, call-service.ts line 167, import-service.ts lines 147,218, auth-service.ts lines 102-103) with logger.error() or logger.warn() as appropriate.",
+    "Replace console.log in lib/env.ts development startup messages (lines 144-153) with logger.info() guarded by isDevelopment.",
+    "Keep console.log in seed scripts (prisma/seed.ts, seed-demo.ts, bootstrap.ts) as they are CLI tools run manually.",
+    "Add LOG_LEVEL environment variable validation in lib/env.ts (already exists in schema).",
+    "Update lib/api.ts line 29 to use logger.error() instead of console.error.",
+    "Document logging best practices in CONTRIBUTING.md or ARCHITECTURE.md.",
+    "Test that logs are properly structured and redact sensitive fields (password, token, etc) per lib/logger.ts redaction logic."
+  ],
+  "acceptance_criteria": [
+    "All console.error/warn/log in application code (app/, services/, lib/ excluding seed scripts) replaced with logger calls",
+    "Logs are structured JSON in production (verify with LOG_LEVEL=error NODE_ENV=production)",
+    "Sensitive fields (password, token) are redacted in logs",
+    "Development logs remain human-readable with colors/formatting",
+    "No breaking changes to existing functionality"
+  ],
+  "verification": [
+    "grep -r 'console\\.(log|error|warn)' app/ services/ lib/ --exclude-dir=node_modules | wc -l should be 0 after changes (excluding lib/logger.ts, env.ts startup)",
+    "npm run test to ensure no regressions",
+    "Start app with LOG_LEVEL=debug and verify structured JSON output in logs"
+  ],
+  "blocked_reason": null,
+  "findings": "40+ console.* calls in application code. lib/logger.ts exists with structured logging and redaction but is unused. No centralized error tracking. Production logs would contain sensitive data without redaction. Error boundaries log to console instead of logger."
+}
