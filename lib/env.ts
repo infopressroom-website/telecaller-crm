@@ -131,7 +131,7 @@ export function getOptionalEnv(key: string): string | undefined {
  */
 export const features = {
   redis: Boolean(env.REDIS_URL),
-  telephony: Boolean(env.TELEPHONY_PROVIDER && env.TELEPHONY_PROVIDER !== ""),
+  telephony: Boolean(env.TELEPHONY_PROVIDER),
   ai: Boolean(env.ANTHROPIC_API_KEY),
   storage: Boolean(env.STORAGE_BUCKET),
   automation: Boolean(env.CRON_SECRET),

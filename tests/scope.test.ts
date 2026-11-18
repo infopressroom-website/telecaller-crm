@@ -28,7 +28,7 @@ import { callScopeWhere, followUpScopeWhere, taskScopeWhere, userScopeWhere } fr
 
 describe("scope filters for calls, follow-ups, tasks and users", () => {
   const own = { kind: "OWN", userId: "u1" } as const;
-  const teams = { kind: "TEAMS", userId: "u1", teamIds: ["t1"] } as const;
+  const teams = { kind: "TEAMS" as const, userId: "u1", teamIds: ["t1"] };
   const none = { kind: "NONE" } as const;
 
   it("telecallers only see their own records", () => {

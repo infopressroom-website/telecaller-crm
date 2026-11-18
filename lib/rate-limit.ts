@@ -1,72 +1,59 @@
 /**
  * Rate limiting utilities for API endpoints
  * Prevents brute force attacks and abuse
- */
-
-import { LRUCache } from "lru-cache";
-
-type RateLimitOptions = {
-  uniqueTokenPerInterval?: number;
-  interval?: number;
-  maxAttempts?: number;
-};
-
-/**
- * In-memory rate limiter using LRU cache
+ * 
+ * In-memory implementation using Map with sliding window
  * For production, consider Redis-based rate limiting
  */
-export function rateLimit(options?: RateLimitOptions) {
-  const tokenCache = new LRUCache({
-    max: options?.uniqueTokenPerInterval || 500,
-    ttl: options?.interval || 60000, // 1 minute default
-  });
 
-  return {
-    check: (limit: number, token: string): { success: boolean; remaining: number; reset: number } => {
-      const tokenCount = (tokenCache.get(token) as number[]) || [0];
-      if (tokenCount[0] === 0) {
-        tokenCache.set(token, tokenCount);
-      }
-      tokenCount[0] += 1;
+type RateLimitEntry = {
+  count: number;
+  windowStart: number;
+};
 
-      const currentUsage = tokenCount[0];
-      const isRateLimited = currentUsage > limit;
-      const remaining = Math.max(0, limit - currentUsage);
-      const reset = Date.now() + (options?.interval || 60000);
+const store = new Map<string, RateLimitEntry>();
 
-      return {
-        success: !isRateLimited,
-        remaining,
-        reset,
-      };
-    },
-  };
+/**
+ * Simple in-memory rate limiter with sliding window
+ * @param key - Unique identifier for the rate limit (e.g., "login:ip:127.0.0.1")
+ * @param limit - Maximum number of attempts allowed in the window
+ * @param windowMs - Time window in milliseconds
+ * @param now - Optional timestamp for testing (defaults to Date.now())
+ * @returns {ok: boolean, retryAfterSec?: number}
+ */
+export function rateLimit(
+  key: string,
+  limit: number,
+  windowMs: number,
+  now = Date.now()
+): { ok: boolean; retryAfterSec?: number } {
+  const entry = store.get(key);
+  
+  // No entry yet or window has expired - allow and start new window
+  if (!entry || now - entry.windowStart >= windowMs) {
+    store.set(key, { count: 1, windowStart: now });
+    return { ok: true };
+  }
+  
+  // Within window - check if under limit
+  if (entry.count < limit) {
+    entry.count++;
+    return { ok: true };
+  }
+  
+  // Over limit - calculate retry time
+  const windowEnd = entry.windowStart + windowMs;
+  const retryAfterSec = Math.ceil((windowEnd - now) / 1000);
+  
+  return { ok: false, retryAfterSec };
 }
 
 /**
- * Pre-configured rate limiters for common use cases
+ * Reset all rate limits (for testing only)
  */
-
-// Authentication endpoints: 5 attempts per minute per IP
-export const authRateLimit = rateLimit({
-  interval: 60 * 1000, // 1 minute
-  uniqueTokenPerInterval: 500,
-  maxAttempts: 5,
-});
-
-// General API endpoints: 100 requests per minute per user/IP
-export const apiRateLimit = rateLimit({
-  interval: 60 * 1000,
-  uniqueTokenPerInterval: 500,
-  maxAttempts: 100,
-});
-
-// Strict rate limit for password reset: 3 attempts per hour per IP
-export const passwordResetRateLimit = rateLimit({
-  interval: 60 * 60 * 1000, // 1 hour
-  uniqueTokenPerInterval: 1000,
-  maxAttempts: 3,
-});
+export function resetRateLimits(): void {
+  store.clear();
+}
 
 /**
  * Helper to get a unique identifier for rate limiting
@@ -85,47 +72,4 @@ export function getRateLimitIdentifier(
     request.headers.get("x-real-ip") || "unknown";
 
   return `ip:${ip}`;
-}
-
-/**
- * Middleware helper for Next.js API routes
- */
-export async function withRateLimit<T>(
-  request: Request,
-  identifier: string,
-  limiter: ReturnType<typeof rateLimit>,
-  limit: number,
-  handler: () => Promise<T>
-): Promise<Response | T> {
-  const result = limiter.check(limit, identifier);
-
-  if (!result.success) {
-    return new Response(
-      JSON.stringify({
-        error: "Too many requests. Please try again later.",
-        retryAfter: new Date(result.reset).toISOString(),
-      }),
-      {
-        status: 429,
-        headers: {
-          "Content-Type": "application/json",
-          "X-RateLimit-Limit": limit.toString(),
-          "X-RateLimit-Remaining": result.remaining.toString(),
-          "X-RateLimit-Reset": result.reset.toString(),
-          "Retry-After": Math.ceil((result.reset - Date.now()) / 1000).toString(),
-        },
-      }
-    );
-  }
-
-  // Add rate limit headers to successful responses
-  const response = await handler();
-  
-  if (response instanceof Response) {
-    response.headers.set("X-RateLimit-Limit", limit.toString());
-    response.headers.set("X-RateLimit-Remaining", result.remaining.toString());
-    response.headers.set("X-RateLimit-Reset", result.reset.toString());
-  }
-
-  return response;
 }

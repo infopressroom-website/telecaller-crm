@@ -77,8 +77,8 @@ async function main() {
   await prisma.user.update({ where: { id: tl2.id }, data: { teamId: teamB.id, reportingToId: mgr.id } });
 
   const base = await prisma.user.findUniqueOrThrow({ where: { email: "telecaller@crm.test" } });
-  await prisma.user.update({ where: { id: base.id }, data: { teamId: teamA.id, reportingToId: tl1.id } });
-  const agents = [{ ...base, teamId: teamA.id }];
+  const baseUpdated = await prisma.user.update({ where: { id: base.id }, data: { teamId: teamA.id, reportingToId: tl1.id } });
+  const agents = [baseUpdated];
   for (let i = 1; i <= 4; i++) {
     const team = i <= 2 ? teamA : teamB;
     const u = await mkUser(`dev.telecaller${i}@crm.test`, `Dev Telecaller ${i}`, "TELECALLER");

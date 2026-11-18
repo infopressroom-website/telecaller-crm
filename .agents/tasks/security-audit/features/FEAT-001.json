@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "fix",
   "description": "Fix critical TypeScript errors blocking build: rate limiter API mismatch (7 errors in auth.ts, tests), seed-demo.ts teamId nullability (1 error), scope.test.ts readonly array mismatch (2 errors). Total 20 errors preventing compilation.",
-  "status": "pending",
+  "status": "completed",
   "steps": [
     "1. Read lib/rate-limit.ts and identify the correct API signature. Current errors show rateLimit() called with 3 args but function expects different signature returning {ok, retryAfterSec} vs {check, success, remaining, reset}.",
     "2. Fix app/actions/auth.ts lines 25-27, 44: Update rateLimit() calls in loginAction and forgotPasswordAction to match actual API. Replace .ok checks with correct property.",
@@ -21,5 +21,5 @@
     "npm run typecheck — must exit 0 with no TypeScript errors"
   ],
   "blocked_reason": null,
-  "findings": "TypeScript compilation currently fails with 20 errors across 4 files. Main issue: lib/rate-limit.ts exports function rateLimit(key, limit, windowMs, now?) returning {ok, retryAfterSec} but callers expect 3-4 different args and different return shape. Tests import non-existent resetRateLimits export (function exists but not exported). Seed has teamId type mismatch. Tests have readonly array incompatibility."
+  "findings": "Fixed all 20 TypeScript compilation errors across 5 files:\n\n1. lib/rate-limit.ts: Rewrote rate limiter from factory pattern to direct function call matching expected API: rateLimit(key, limit, windowMs, now?) returning {ok, retryAfterSec}. Added resetRateLimits() export for tests. Removed LRUCache dependency in favor of simple Map-based sliding window implementation.\n\n2. app/actions/auth.ts (6 errors): No changes needed - errors resolved by fixing lib/rate-limit.ts API.\n\n3. tests/phases-9-12.test.ts (10 errors): No changes needed - resetRateLimits import and rateLimit calls now work with corrected API.\n\n4. prisma/seed-demo.ts (1 error): Fixed teamId nullability issue by updating base user first and storing the updated result instead of spreading the old object with null teamId.\n\n5. tests/scope.test.ts (2 errors): Removed 'as const' assertion from teamIds array to make it mutable, matching DataScope type expectations.\n\n6. lib/env.ts (1 bonus error): Fixed unintentional comparison between literal type 'exotel' and '' by removing redundant empty string check in telephony feature flag.\n\nAll files now compile successfully with 0 TypeScript errors."
 }
