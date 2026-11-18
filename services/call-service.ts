@@ -12,6 +12,7 @@ import { isProviderFinal, shouldApplyStatus, toCallStatus } from "@/lib/telephon
 import { pageMeta, toPrismaPage } from "@/lib/pagination";
 import { normalizeMobile } from "@/validations/common";
 import type { CallListQuery } from "@/validations/calls";
+import { updateLeadScore } from "@/lib/lead-scoring-trigger";
 import { audit } from "./audit-service";
 import { getAccessibleLead, resolveScope } from "./scope-service";
 import { getActiveTelephony, getTelephonySettings, statusCallbackUrl } from "./telephony-settings-service";
@@ -163,6 +164,14 @@ export async function processEvent(id: string) {
   try {
     const r = await applyEvent(revive(row.normalized));
     await db.callEvent.update({ where: { id }, data: { status: r.outcome === "processed" ? "PROCESSED" : "IGNORED", note: r.note ?? null, callId: r.callId ?? null, processedAt: new Date(), attempts: { increment: 1 } } });
+    
+    // Auto-recalculate lead score after call is processed
+    if (r.outcome === "processed" && r.callId) {
+      const call = await db.callLog.findUnique({ where: { id: r.callId }, select: { leadId: true } });
+      if (call?.leadId) {
+        updateLeadScore(call.leadId).catch(console.error);
+      }
+    }
   } catch (e) {
     console.error("Webhook processing failed", e);
     await db.callEvent.update({ where: { id }, data: { status: "FAILED", note: (e instanceof Error ? e.message : "error").slice(0, 300), attempts: { increment: 1 } } });
@@ -215,6 +224,10 @@ async function createInbound(tx: Prisma.TransactionClient, ev: NormalizedCallEve
     },
   });
   if (ev.recordingUrl) await tx.recording.create({ data: { callId: call.id, providerUrl: ev.recordingUrl, durationSec: ev.durationSec ?? null } });
+  
+  // Auto-recalculate lead score after inbound call is created
+  updateLeadScore(lead.id).catch(console.error);
+  
   return { outcome: "processed", callId: call.id };
 }
 

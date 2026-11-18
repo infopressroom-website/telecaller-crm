@@ -48,7 +48,7 @@ export async function listLeads(user: AuthUser, q: LeadListQuery) {
     ...toPrismaPage(q),
     select: {
       id: true, leadCode: true, name: true, primaryMobile: true, city: true, status: true, priority: true,
-      nextFollowUpAt: true, createdAt: true,
+      nextFollowUpAt: true, createdAt: true, score: true,
       owner: { select: { name: true } }, team: { select: { name: true } },
       source: { select: { name: true } }, campaign: { select: { name: true } },
     },

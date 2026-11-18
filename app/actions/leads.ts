@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { AppError } from "@/lib/errors";
+import { updateLeadScore } from "@/lib/lead-scoring-trigger";
 import {
   addNote, bulkAssign, bulkStatus, changeStatus, createLead, deleteView, mergeLeads, saveView, updateLead,
 } from "@/services/lead-service";
@@ -49,6 +50,8 @@ export async function updateLeadAction(_prev: FormState, fd: FormData): Promise<
   if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
   try {
     await updateLead(user, id, parsed.data);
+    // Auto-recalculate lead score after update
+    updateLeadScore(id).catch(console.error);
   } catch (e) {
     return fail(e);
   }
@@ -62,6 +65,8 @@ export async function changeStatusAction(_prev: FormState, fd: FormData): Promis
   if (!parsed.success) return { error: "Choose a valid status." };
   try {
     await changeStatus(user, parsed.data.leadId, parsed.data.status);
+    // Auto-recalculate lead score after status change
+    updateLeadScore(parsed.data.leadId).catch(console.error);
   } catch (e) {
     return fail(e);
   }

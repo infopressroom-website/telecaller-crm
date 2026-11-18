@@ -31,6 +31,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Record
     status: r.status, priority: r.priority, owner: r.owner?.name ?? null, team: r.team?.name ?? null,
     source: r.source?.name ?? null, campaign: r.campaign?.name ?? null,
     nextFollowUpAt: r.nextFollowUpAt?.toISOString() ?? null, createdAt: r.createdAt.toISOString(),
+    score: r.score ?? null,
   }));
   const isTelecaller = user.roleKey === "TELECALLER";
   const baseQs = toQuery(q);

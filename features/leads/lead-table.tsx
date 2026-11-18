@@ -8,12 +8,14 @@ import { Badge, LEAD_STATUS_TONE } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FormMessage } from "@/components/ui/form-message";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { LeadScoreBadge } from "@/components/leads/lead-score-badge";
 import { LEAD_STATUSES, PRIORITY_LABELS, STATUS_LABELS, type LeadPriorityValue, type LeadStatusValue } from "@/lib/leads/fields";
 
 export type LeadRow = {
   id: string; leadCode: string; name: string; primaryMobile: string; city: string | null;
   status: LeadStatusValue; priority: LeadPriorityValue; owner: string | null; team: string | null;
   source: string | null; campaign: string | null; nextFollowUpAt: string | null; createdAt: string;
+  score: number | null;
 };
 
 const date = (iso: string | null) =>
@@ -80,7 +82,7 @@ export function LeadTable({
                     onChange={() => setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.id)))} className="h-5 w-5" />
                 </th>
               )}
-              {["Lead", "Mobile", "Status", "Priority", "Assigned to", "Source / campaign", "Next follow-up", "Created"].map((h) => (
+              {["Lead", "Mobile", "Status", "Score", "Priority", "Assigned to", "Source / campaign", "Next follow-up", "Created"].map((h) => (
                 <th key={h} scope="col" className="whitespace-nowrap px-3 py-2 font-semibold">{h}</th>
               ))}
             </tr>
@@ -99,6 +101,7 @@ export function LeadTable({
                 </td>
                 <td className="whitespace-nowrap px-3 py-3">+{r.primaryMobile}</td>
                 <td className="px-3 py-3"><Badge tone={LEAD_STATUS_TONE[r.status] ?? "neutral"}>{STATUS_LABELS[r.status]}</Badge></td>
+                <td className="px-3 py-3"><LeadScoreBadge leadId={r.id} score={r.score} /></td>
                 <td className="px-3 py-3">{PRIORITY_LABELS[r.priority]}</td>
                 <td className="px-3 py-3">{r.owner ?? <span className="text-ink-muted">Unassigned</span>}{r.team && <div className="text-xs text-ink-muted">{r.team}</div>}</td>
                 <td className="px-3 py-3">{r.source ?? "—"}{r.campaign && <div className="text-xs text-ink-muted">{r.campaign}</div>}</td>

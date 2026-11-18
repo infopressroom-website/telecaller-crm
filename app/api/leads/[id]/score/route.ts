@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { requireUser } from '@/lib/auth/session';
+import { assertCan } from '@/lib/auth/rbac';
+import { db } from '@/lib/db';
 import { calculateLeadScore } from '@/lib/lead-scoring';
+import { AppError } from '@/lib/errors';
 
 /**
  * Calculate and update lead score
@@ -13,25 +14,26 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const user = await requireUser();
+    assertCan(user, 'lead', 'VIEW');
 
     const leadId = params.id;
 
     // Fetch lead with call logs for scoring
-    const lead = await prisma.lead.findUnique({
+    const lead = await db.lead.findUnique({
       where: { id: leadId },
       include: {
         callLogs: {
           orderBy: { createdAt: 'desc' },
           take: 50 // Last 50 calls for calculation
-        }
+        },
+        followUps: {
+          where: {
+            status: 'PENDING',
+          },
+          orderBy: { scheduledAt: 'asc' },
+          take: 10,
+        },
       }
     });
 
@@ -43,26 +45,30 @@ export async function POST(
     }
 
     // Calculate score
-    const scoreData = calculateLeadScore(lead);
+    const scoreTotal = calculateLeadScore(lead);
 
     // Update lead with new score
-    const updatedLead = await prisma.lead.update({
+    const updatedLead = await db.lead.update({
       where: { id: leadId },
       data: {
-        score: scoreData.total
+        score: scoreTotal
       }
     });
 
     return NextResponse.json({
       success: true,
-      score: scoreData.total,
-      breakdown: scoreData.breakdown,
-      grade: scoreData.grade,
+      score: scoreTotal,
       lead: updatedLead
     });
 
   } catch (error) {
     console.error('Lead scoring error:', error);
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.code === 'FORBIDDEN' ? 403 : 500 }
+      );
+    }
     return NextResponse.json(
       { error: 'Failed to calculate lead score' },
       { status: 500 }
@@ -79,24 +85,25 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const user = await requireUser();
+    assertCan(user, 'lead', 'VIEW');
 
     const leadId = params.id;
 
-    const lead = await prisma.lead.findUnique({
+    const lead = await db.lead.findUnique({
       where: { id: leadId },
       include: {
         callLogs: {
           orderBy: { createdAt: 'desc' },
           take: 50
-        }
+        },
+        followUps: {
+          where: {
+            status: 'PENDING',
+          },
+          orderBy: { scheduledAt: 'asc' },
+          take: 10,
+        },
       }
     });
 
@@ -108,16 +115,22 @@ export async function GET(
     }
 
     // Calculate current score (even if not saved)
-    const scoreData = calculateLeadScore(lead);
+    const scoreTotal = calculateLeadScore(lead);
 
     return NextResponse.json({
-      score: lead.score || scoreData.total,
-      calculated: scoreData,
+      score: lead.score || scoreTotal,
+      calculated: scoreTotal,
       lastUpdated: lead.updatedAt
     });
 
   } catch (error) {
     console.error('Get lead score error:', error);
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.code === 'FORBIDDEN' ? 403 : 500 }
+      );
+    }
     return NextResponse.json(
       { error: 'Failed to get lead score' },
       { status: 500 }

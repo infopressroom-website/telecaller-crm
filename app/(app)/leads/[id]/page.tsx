@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { LeadForm } from "@/features/leads/lead-form";
 import { ScheduleFollowUpForm } from "@/features/followups/schedule-form";
 import { MergeForm, NoteForm, StatusForm } from "@/features/leads/side-forms";
+import { LeadScoreDetails } from "@/components/leads/lead-score-details";
 import { can } from "@/lib/auth/rbac";
 import { requirePagePermission } from "@/lib/auth/session";
 import { AppError } from "@/lib/errors";
@@ -66,6 +67,10 @@ export default async function LeadDetailPage({ params }: { params: { id: string 
           </Card>
         </div>
         <div className="flex flex-col gap-4">
+          <Card>
+            <h2 className="mb-3 text-base font-semibold">Lead Score</h2>
+            <LeadScoreDetails leadId={lead.id} />
+          </Card>
           {canEdit && <Card><h2 className="mb-3 text-base font-semibold">Status</h2><StatusForm leadId={lead.id} status={lead.status} /></Card>}
           {canEdit && <Card><h2 className="mb-3 text-base font-semibold">Add a note</h2><NoteForm leadId={lead.id} /></Card>}
           {can(user, "followup", "CREATE") && <Card><h2 className="mb-3 text-base font-semibold">Schedule a follow-up</h2><ScheduleFollowUpForm leadId={lead.id} /></Card>}
