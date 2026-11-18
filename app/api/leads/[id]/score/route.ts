@@ -31,7 +31,7 @@ export async function POST(
           where: {
             status: 'PENDING',
           },
-          orderBy: { scheduledAt: 'asc' },
+          orderBy: { dueAt: 'asc' },
           take: 10,
         },
       }
@@ -101,7 +101,7 @@ export async function GET(
           where: {
             status: 'PENDING',
           },
-          orderBy: { scheduledAt: 'asc' },
+          orderBy: { dueAt: 'asc' },
           take: 10,
         },
       }

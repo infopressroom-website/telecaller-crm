@@ -22,7 +22,7 @@ export async function updateLeadScore(leadId: string): Promise<number> {
         where: {
           status: "PENDING",
         },
-        orderBy: { scheduledAt: "asc" },
+        orderBy: { dueAt: "asc" },
         take: 10,
       },
     },
