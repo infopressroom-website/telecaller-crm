@@ -1,0 +1,38 @@
+# Local/staging stack: PostgreSQL + one-off migration + the app. NOT YET RUN (see docs/DEPLOYMENT.md).
+# Usage:  cp .env.example .env  (edit secrets)  &&  docker compose up --build
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: crm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: telecaller_crm
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm -d telecaller_crm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build: { context: ., target: builder }
+    command: sh -c "npx prisma migrate deploy"
+    environment:
+      DATABASE_URL: postgresql://crm:${POSTGRES_PASSWORD}@db:5432/telecaller_crm?schema=public
+    depends_on: { db: { condition: service_healthy } }
+    restart: "no"
+
+  app:
+    build: { context: ., target: runner, args: { APP_VERSION: "${APP_VERSION:-dev}" } }
+    ports: ["3000:3000"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://crm:${POSTGRES_PASSWORD}@db:5432/telecaller_crm?schema=public
+      NODE_ENV: production
+    depends_on:
+      db: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+volumes:
+  pgdata:

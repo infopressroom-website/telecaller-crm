@@ -1,0 +1,33 @@
+{
+  "id": "FEAT-002",
+  "type": "fix",
+  "description": "Update dependencies to resolve security vulnerabilities: upgrade Next.js 14.2.15→15.x (or latest 14.x patch) to fix 3 critical (RCE, auth bypass) + 8 high severity issues; update postcss 8.4.47→8.5.x (2 high: path traversal); update vitest 2.1.3→latest (2 critical: RCE, arbitrary file read); update zod 3.23.8→3.x latest (1 high: DoS). Also update eslint 8→9, recharts 2→3, and other outdated but non-vulnerable deps.",
+  "status": "pending",
+  "steps": [
+    "1. Update Next.js and related packages: npm install next@latest eslint-config-next@latest react@latest react-dom@latest @types/react@latest @types/react-dom@latest. Verify compatibility (Next 15 may require React 19; check if app code is compatible or stay on Next 14.x latest patch).",
+    "2. Update critical security fixes: npm install postcss@latest vitest@latest (check if latest vitest has breaking changes; may need to update test files).",
+    "3. Update Zod: npm install zod@latest. Check if major version bump (3.x→4.x) has breaking changes in schema definitions used across validations/.",
+    "4. Update other outdated dependencies: npm install recharts@latest eslint@latest prettier@latest lucide-react@latest papaparse@latest tsx@latest autoprefixer@latest tailwindcss@latest tailwind-merge@latest typescript@latest (check TypeScript 5.6→7.x compatibility).",
+    "5. Update Prisma: npm install prisma@latest @prisma/client@latest && npm run db:generate. Check if schema or query syntax needs updates.",
+    "6. Update bcryptjs: npm install bcryptjs@latest @types/bcryptjs@latest. Verify password hashing still works (cost factor unchanged).",
+    "7. After all updates, run npm audit to verify vulnerabilities are resolved. Address any remaining issues.",
+    "8. Check for breaking changes: review changelogs for Next.js, Zod, Vitest, TypeScript major version bumps. Update code as needed.",
+    "9. Update next.config.mjs if Next.js 15 requires config changes (e.g., new compiler options, changed security headers format).",
+    "10. Run npm run typecheck && npm run lint to catch any API changes from dependency updates."
+  ],
+  "acceptance_criteria": [
+    "npm audit reports 0 vulnerabilities (or only low/moderate non-exploitable issues)",
+    "All critical and high severity CVEs are resolved",
+    "Next.js updated to secure version (15.x or 14.x latest with all patches)",
+    "Dependencies up to date with no known security issues",
+    "Application still compiles and passes type checks after updates"
+  ],
+  "verification": [
+    "npm audit --json | ConvertFrom-Json | Select-Object -ExpandProperty metadata | Select-Object -ExpandProperty vulnerabilities — critical and high counts must be 0",
+    "npm run typecheck — must pass",
+    "npm run lint — must pass",
+    "npm run build — must succeed"
+  ],
+  "blocked_reason": null,
+  "findings": "Current vulnerabilities: Next.js 14.2.15 has 3 critical (GHSA-p293-qw3h-jr36 RCE on Windows, GHSA-2xp9-vwfh-vxw4 RCE via AVIF, GHSA-2464-fhr4-w9xw RCE via SVG, GHSA-f82v-jwr5-mffw auth bypass) + 8 high severity DoS/SSRF issues. Postcss 8.4.47 has 2 high (GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849 path traversal). Vitest 2.1.3 has 2 critical (GHSA-9crc-q9x8-hgqq RCE, GHSA-5xrq-8626-4rwp arbitrary file read). Tinypool (via vitest) has 2 critical prototype pollution. Zod 3.23.8 has 1 high (GHSA-mrhx-c7xc-m3w5 DoS). Many transitive vulnerabilities via glob, picomatch, micromatch, chokidar in dev dependencies. npm outdated shows: next 14.2.15→16.4.6, vitest 2.1.3→5.1.1, zod 3.23.8→4.6.7, eslint 8.57.1→10.15.0, recharts 2.13.0→3.11.0, prisma 5.20.0→8.0.0-rc.34, typescript 5.6.3→7.0.2, react 18.3.1→19.3.1."
+}

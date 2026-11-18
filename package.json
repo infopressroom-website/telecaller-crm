@@ -1,0 +1,63 @@
+{
+  "name": "telecaller-crm",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio",
+    "test": "vitest run",
+    "db:seed:demo": "tsx prisma/seed-demo.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "postinstall": "prisma generate",
+    "db:push": "prisma db push",
+    "verify": "prisma generate && tsc --noEmit && next lint && vitest run && next build",
+    "test:all": "vitest run && vitest run --config vitest.integration.config.ts",
+    "db:bootstrap": "tsx prisma/bootstrap.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "5.20.0",
+    "bcryptjs": "2.4.3",
+    "clsx": "2.1.1",
+    "exceljs": "4.4.0",
+    "lru-cache": "^11.5.3",
+    "lucide-react": "0.453.0",
+    "next": "14.2.15",
+    "papaparse": "5.4.1",
+    "pdf-lib": "1.17.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "recharts": "2.13.0",
+    "server-only": "0.0.1",
+    "tailwind-merge": "2.5.4",
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "2.4.6",
+    "@types/node": "20.16.11",
+    "@types/papaparse": "5.3.14",
+    "@types/react": "18.3.11",
+    "@types/react-dom": "18.3.1",
+    "autoprefixer": "10.4.20",
+    "eslint": "8.57.1",
+    "eslint-config-next": "14.2.15",
+    "postcss": "8.4.47",
+    "prettier": "3.3.3",
+    "prisma": "5.20.0",
+    "tailwindcss": "3.4.14",
+    "tsx": "4.19.1",
+    "typescript": "5.6.3",
+    "vitest": "2.1.3"
+  }
+}

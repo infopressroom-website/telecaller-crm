@@ -1,0 +1,30 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_USER: crm, POSTGRES_PASSWORD: crm, POSTGRES_DB: crm_test }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U crm" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://crm:crm@localhost:5432/crm_test?schema=public
+      TEST_DATABASE_URL: postgresql://crm:crm@localhost:5432/crm_test?schema=public
+      AUTH_SECRET: ci-secret-ci-secret-ci-secret-ci-secret-0123
+      SEED_DEV_PASSWORD: CiOnly-Password-123
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm install        # use `npm ci` once package-lock.json is committed
+      - run: npx prisma generate
+      - run: npx tsc --noEmit
+      - run: npx next lint
+      - run: npx vitest run
+      - run: npx prisma db push --skip-generate
+      - run: npm run db:seed
+      - run: npm run test:integration
+      - run: npm run build

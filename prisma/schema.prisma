@@ -1,0 +1,941 @@
+// Telecaller CRM — Phase 01 schema.
+// Conventions: cuid ids, createdAt/updatedAt on mutable tables, archivedAt for soft delete,
+// append-only history tables (LeadAssignment, CallLog, AuditLog) are never overwritten.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────── Enums ─────────────
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum PermissionAction {
+  VIEW
+  CREATE
+  EDIT
+  DELETE
+  ASSIGN
+  EXPORT
+  APPROVE
+  MANAGE
+}
+
+enum LeadStatus {
+  NEW
+  ASSIGNED
+  ATTEMPTED
+  CONNECTED
+  INTERESTED
+  FOLLOW_UP
+  QUALIFIED
+  CONVERTED
+  LOST
+  INVALID
+  DND
+}
+
+enum LeadPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum AssignmentMethod {
+  ROUND_ROBIN
+  EQUAL_DISTRIBUTION
+  WORKLOAD_BASED
+  CAMPAIGN_BASED
+  LOCATION_BASED
+  MANUAL
+  REASSIGNMENT
+}
+
+enum AssignmentApproval {
+  NOT_REQUIRED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum CallDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum CallStatus {
+  INITIATED
+  RINGING
+  IN_PROGRESS
+  COMPLETED
+  NOT_ANSWERED
+  BUSY
+  FAILED
+  CANCELED
+}
+
+enum FollowUpStatus {
+  PENDING
+  COMPLETED
+  MISSED
+  RESCHEDULED
+  CANCELED
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  CANCELED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  HALF_DAY
+  ON_LEAVE
+  HOLIDAY
+}
+
+enum TargetPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum TargetMetric {
+  CALL_ATTEMPTS
+  CONNECTED_CALLS
+  INTERESTED_LEADS
+  CONVERSIONS
+  FOLLOWUPS_COMPLETED
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  WHATSAPP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  READ
+}
+
+enum IncentiveStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  PAID
+  REJECTED
+}
+
+// ───────────── Identity & access ─────────────
+
+model Role {
+  id          String           @id @default(cuid())
+  key         String           @unique // e.g. SUPER_ADMIN, TELECALLER
+  name        String
+  description String?
+  isSystem    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  users       User[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id       String           @id @default(cuid())
+  resource String // e.g. lead, call, report
+  action   PermissionAction
+  roles    RolePermission[]
+
+  @@unique([resource, action])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model User {
+  id              String     @id @default(cuid())
+  employeeId      String?    @unique
+  name            String
+  email           String     @unique
+  phone           String?
+  passwordHash    String
+  status          UserStatus @default(INVITED)
+  roleId          String
+  role            Role       @relation(fields: [roleId], references: [id])
+  teamId          String?
+  team            Team?      @relation("TeamMembers", fields: [teamId], references: [id])
+  reportingToId   String?
+  reportingTo     User?      @relation("Reporting", fields: [reportingToId], references: [id])
+  reports         User[]     @relation("Reporting")
+  joinedAt        DateTime?
+  lastLoginAt     DateTime?
+  failedLogins    Int        @default(0)
+  lockedUntil     DateTime?
+  maxActiveLeads  Int?
+  dailyLeadLimit  Int?
+  mustChangePassword Boolean @default(false) // set for temporary passwords; the user must choose their own before using the app
+  assignmentPaused Boolean   @default(false) // manager switch: no NEW automatic assignments
+  serviceCities   String[]   @default([]) // for location-based distribution
+  serviceStates   String[]   @default([])
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  archivedAt      DateTime?
+
+  ledTeams        Team[]            @relation("TeamLeader")
+  assignedLeads   Lead[]            @relation("LeadOwner")
+  assignmentsIn   LeadAssignment[]  @relation("AssignmentTo")
+  assignmentsOut  LeadAssignment[]  @relation("AssignmentFrom")
+  assignmentsMade LeadAssignment[]  @relation("AssignmentActor")
+  calls           CallLog[]
+  followUps       FollowUp[]        @relation("FollowUpOwner")
+  tasksOwned      Task[]            @relation("TaskOwner")
+  tasksCreated    Task[]            @relation("TaskCreator")
+  attendance      Attendance[]
+  shifts          UserShift[]
+  targets         Target[]
+  incentives      Incentive[]
+  notifications   Notification[]
+  qaGiven         QaReview[]        @relation("QaReviewer")
+  qaReceived      QaReview[]        @relation("QaAgent")
+  auditLogs       AuditLog[]
+  loginHistory    LoginHistory[]
+  sessions        Session[]
+  resetTokens     PasswordResetToken[]
+  leadActivities  LeadActivity[]
+  importBatches   ImportBatch[]
+  savedViews      SavedView[]
+  reqRequested    ReassignmentRequest[] @relation("ReqRequester")
+  reqReceived     ReassignmentRequest[] @relation("ReqTarget")
+  automationRules AutomationRule[]
+
+  @@index([roleId])
+  @@index([teamId])
+  @@index([status])
+}
+
+// Server-side sessions. Only a SHA-256 hash of the cookie token is stored.
+model Session {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime // absolute expiry
+  lastSeenAt DateTime  @default(now()) // idle-timeout tracking
+  ipAddress  String?
+  userAgent  String?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model LoginHistory {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email     String
+  success   Boolean
+  ipAddress String?
+  userAgent String?
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([email, createdAt])
+}
+
+model Team {
+  id         String    @id @default(cuid())
+  name       String    @unique
+  leaderId   String?
+  leader     User?     @relation("TeamLeader", fields: [leaderId], references: [id])
+  members    User[]    @relation("TeamMembers")
+  leads      Lead[]
+  targets    Target[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+}
+
+// ───────────── Leads ─────────────
+
+model LeadSource {
+  id         String    @id @default(cuid())
+  name       String    @unique
+  isActive   Boolean   @default(true)
+  leads      Lead[]
+  createdAt  DateTime  @default(now())
+  archivedAt DateTime?
+}
+
+model Campaign {
+  id         String    @id @default(cuid())
+  name       String    @unique
+  isActive   Boolean   @default(true)
+  startsAt   DateTime?
+  endsAt     DateTime?
+  leads      Lead[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+}
+
+model Lead {
+  id             String       @id @default(cuid())
+  leadCode       String       @unique // human-friendly, e.g. LD-000123 (generated in service layer)
+  name           String
+  primaryMobile  String // stored normalised (digits, with country code)
+  alternateMobile String?
+  email          String?
+  city           String?
+  state          String?
+  status         LeadStatus   @default(NEW)
+  priority       LeadPriority @default(MEDIUM)
+  sourceId       String?
+  source         LeadSource?  @relation(fields: [sourceId], references: [id])
+  campaignId     String?
+  campaign       Campaign?    @relation(fields: [campaignId], references: [id])
+  ownerId        String?
+  owner          User?        @relation("LeadOwner", fields: [ownerId], references: [id])
+  teamId         String?
+  team           Team?        @relation(fields: [teamId], references: [id])
+  nextFollowUpAt DateTime?
+  lastContactedAt DateTime?
+  notes          String?
+  customFields   Json? // configurable optional fields
+  mergedIntoId   String? // set when this lead was merged into another (then archivedAt is set too)
+  mergedInto     Lead?        @relation("LeadMerge", fields: [mergedIntoId], references: [id])
+  mergedFrom     Lead[]       @relation("LeadMerge")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  archivedAt     DateTime?
+
+  assignments LeadAssignment[]
+  calls       CallLog[]
+  followUps   FollowUp[]
+  tasks       Task[]
+  activities  LeadActivity[]
+  reassignRequests ReassignmentRequest[]
+
+  // Duplicate detection is a business decision (update/merge/keep), so mobile is NOT unique.
+  @@index([primaryMobile])
+  @@index([ownerId, status])
+  @@index([teamId, status])
+  @@index([campaignId, status])
+  @@index([sourceId])
+  @@index([status, createdAt])
+  @@index([nextFollowUpAt])
+}
+
+// Append-only: every assignment/reassignment adds a row; nothing is overwritten.
+model LeadAssignment {
+  id           String             @id @default(cuid())
+  leadId       String
+  lead         Lead               @relation(fields: [leadId], references: [id])
+  fromUserId   String?
+  fromUser     User?              @relation("AssignmentFrom", fields: [fromUserId], references: [id])
+  toUserId     String?
+  toUser       User?              @relation("AssignmentTo", fields: [toUserId], references: [id])
+  actorId      String?
+  actor        User?              @relation("AssignmentActor", fields: [actorId], references: [id])
+  method       AssignmentMethod
+  approval     AssignmentApproval @default(NOT_REQUIRED)
+  reason       String?
+  idempotencyKey String?          @unique // guards against duplicate assignment jobs
+  ruleId       String? // distribution rule that produced this assignment
+  runId        String? // distribution run it belongs to
+  createdAt    DateTime           @default(now())
+
+  @@index([leadId, createdAt])
+  @@index([toUserId, createdAt])
+  @@index([createdAt])
+}
+
+// ───────────── Calls ─────────────
+
+model CallDisposition {
+  id        String    @id @default(cuid())
+  key       String    @unique // e.g. CONNECTED, NOT_ANSWERED
+  label     String
+  isConnected Boolean @default(false)
+  isFinal   Boolean   @default(false)
+  isActive  Boolean   @default(true)
+  sortOrder Int       @default(0)
+  isSystem  Boolean   @default(false) // built-in outcomes can be relabelled but not deleted
+  requiresFollowUp Boolean @default(false) // the agent must schedule a follow-up
+  setsLeadStatus LeadStatus? // optional: move the lead to this status (custom outcomes)
+  calls     CallLog[]
+}
+
+model CallLog {
+  id             String           @id @default(cuid())
+  leadId         String
+  lead           Lead             @relation(fields: [leadId], references: [id])
+  agentId        String
+  agent          User             @relation(fields: [agentId], references: [id])
+  direction      CallDirection    @default(OUTBOUND)
+  status         CallStatus       @default(INITIATED)
+  dispositionId  String?
+  disposition    CallDisposition? @relation(fields: [dispositionId], references: [id])
+  providerName   String?
+  providerCallId String? // unique per provider, used for duplicate-webhook protection
+  clientRef      String?          @unique // browser-generated reference: makes 'start call' safe to retry (never dials twice)
+  externalStatus String? // the provider's own status text, kept as received
+  startedAt      DateTime?
+  endedAt        DateTime?
+  durationSec    Int?
+  notes          String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  recording Recording?
+  qaReviews QaReview[]
+  transcript CallTranscript?
+  analyses  CallAnalysis[]
+
+  @@unique([providerName, providerCallId])
+  @@index([createdAt])
+  @@index([dispositionId, createdAt])
+  @@index([agentId, startedAt])
+  @@index([leadId, startedAt])
+  @@index([status])
+}
+
+// Metadata only — the audio lives in object storage.
+model Recording {
+  id          String   @id @default(cuid())
+  callId      String   @unique
+  call        CallLog  @relation(fields: [callId], references: [id], onDelete: Cascade)
+  storageKey  String?
+  providerUrl String?
+  durationSec Int?
+  sizeBytes   Int?
+  createdAt   DateTime @default(now())
+}
+
+// ───────────── Work management ─────────────
+
+model FollowUp {
+  id          String         @id @default(cuid())
+  leadId      String
+  lead        Lead           @relation(fields: [leadId], references: [id])
+  ownerId     String
+  owner       User           @relation("FollowUpOwner", fields: [ownerId], references: [id])
+  dueAt       DateTime
+  priority    LeadPriority   @default(MEDIUM)
+  status      FollowUpStatus @default(PENDING)
+  notes       String?
+  completedAt DateTime?
+  rescheduledFromId String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([ownerId, status, dueAt])
+  @@index([leadId])
+  @@index([status, dueAt])
+}
+
+model Task {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus   @default(OPEN)
+  priority    LeadPriority @default(MEDIUM)
+  dueAt       DateTime?
+  ownerId     String
+  owner       User         @relation("TaskOwner", fields: [ownerId], references: [id])
+  creatorId   String?
+  creator     User?        @relation("TaskCreator", fields: [creatorId], references: [id])
+  leadId      String?
+  lead        Lead?        @relation(fields: [leadId], references: [id])
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([ownerId, status])
+}
+
+// ───────────── Workforce ─────────────
+
+model Shift {
+  id        String      @id @default(cuid())
+  name      String      @unique
+  startTime String // "HH:mm"
+  endTime   String // "HH:mm"
+  graceMinutes Int      @default(10)
+  users     UserShift[]
+}
+
+model UserShift {
+  userId    String
+  shiftId   String
+  validFrom DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shift     Shift    @relation(fields: [shiftId], references: [id])
+
+  @@id([userId, shiftId, validFrom])
+}
+
+// Attendance is deliberately separate from call activity and browser presence.
+model Attendance {
+  id         String           @id @default(cuid())
+  userId     String
+  user       User             @relation(fields: [userId], references: [id])
+  date       DateTime         @db.Date
+  status     AttendanceStatus @default(PRESENT)
+  clockInAt  DateTime?
+  clockOutAt DateTime?
+  breakMinutes Int            @default(0)
+  isLate     Boolean          @default(false)
+  notes      String?
+  breaks     AttendanceBreak[]
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@unique([userId, date])
+  @@index([date])
+}
+
+model Target {
+  id        String       @id @default(cuid())
+  userId    String?
+  user      User?        @relation(fields: [userId], references: [id])
+  teamId    String?
+  team      Team?        @relation(fields: [teamId], references: [id])
+  metric    TargetMetric
+  period    TargetPeriod
+  value     Int
+  startsOn  DateTime     @db.Date
+  endsOn    DateTime?    @db.Date
+  createdAt DateTime     @default(now())
+
+  @@index([userId, period])
+  @@index([teamId, period])
+}
+
+model IncentiveSlab {
+  id        String    @id @default(cuid())
+  name      String
+  metric    TargetMetric
+  minValue  Int
+  maxValue  Int?
+  amountPaise Int // money stored in paise to avoid float errors
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+}
+
+model Incentive {
+  id          String          @id @default(cuid())
+  userId      String
+  user        User            @relation(fields: [userId], references: [id])
+  periodStart DateTime        @db.Date
+  periodEnd   DateTime        @db.Date
+  amountPaise Int
+  status      IncentiveStatus @default(DRAFT)
+  calculation Json? // traceable breakdown of how the amount was derived
+  approvedById String?
+  approvedAt  DateTime?
+  createdAt   DateTime        @default(now())
+
+  @@index([userId, periodStart])
+}
+
+// ───────────── Quality, automation, notifications, audit ─────────────
+
+model QaReview {
+  id          String   @id @default(cuid())
+  callId      String
+  call        CallLog  @relation(fields: [callId], references: [id])
+  agentId     String
+  agent       User     @relation("QaAgent", fields: [agentId], references: [id])
+  reviewerId  String
+  reviewer    User     @relation("QaReviewer", fields: [reviewerId], references: [id])
+  score       Int? // 0–100
+  scorecard   Json?
+  feedback    String?
+  coachingNotes String?
+  createdAt   DateTime @default(now())
+
+  @@index([agentId, createdAt])
+  @@index([callId])
+}
+
+model AutomationRule {
+  id         String   @id @default(cuid())
+  name       String
+  trigger    String // e.g. LEAD_CREATED, FOLLOWUP_OVERDUE
+  conditions Json     @default("[]")
+  actions    Json     @default("[]")
+  isEnabled  Boolean  @default(false)
+  createdById String?
+  createdBy  User?    @relation(fields: [createdById], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([trigger, isEnabled])
+}
+
+model Notification {
+  id         String              @id @default(cuid())
+  userId     String
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel    NotificationChannel @default(IN_APP)
+  status     NotificationStatus  @default(PENDING)
+  title      String
+  body       String?
+  link       String?
+  dedupeKey  String?             @unique // prevents duplicate notifications
+  readAt     DateTime?
+  createdAt  DateTime            @default(now())
+
+  @@index([userId, status, createdAt])
+}
+
+// Append-only audit trail.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action     String // e.g. lead.reassign, role.permission.change, export.leads
+  entityType String
+  entityId   String?
+  before     Json?
+  after      Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+}
+
+// ───────────── Phase 05: lead management ─────────────
+
+enum LeadActivityType {
+  FOLLOWUP
+  CREATED
+  UPDATED
+  STATUS_CHANGED
+  NOTE
+  MERGED
+  IMPORTED
+}
+
+enum ImportStatus {
+  MAPPING
+  VALIDATED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ImportRowStatus {
+  PENDING
+  VALID
+  DUPLICATE
+  INVALID
+  CREATED
+  UPDATED
+  SKIPPED
+  FAILED
+}
+
+enum DuplicateStrategy {
+  UPDATE
+  SKIP
+  KEEP_SEPARATE
+}
+
+// Atomic counters (used for human-friendly lead codes).
+model Counter {
+  key   String @id
+  value Int    @default(0)
+}
+
+// Append-only timeline entries (notes, edits, status changes, merges, imports).
+model LeadActivity {
+  id        String           @id @default(cuid())
+  leadId    String
+  lead      Lead             @relation(fields: [leadId], references: [id])
+  type      LeadActivityType
+  actorId   String?
+  actor     User?            @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  message   String?
+  data      Json?
+  createdAt DateTime         @default(now())
+
+  @@index([leadId, createdAt])
+  @@index([type, createdAt])
+}
+
+model ImportBatch {
+  id                String            @id @default(cuid())
+  fileName          String
+  fileSize          Int
+  uploadedById      String
+  uploadedBy        User              @relation(fields: [uploadedById], references: [id])
+  status            ImportStatus      @default(MAPPING)
+  headers           Json
+  mapping           Json?
+  campaignId        String?
+  sourceId          String?
+  duplicateStrategy DuplicateStrategy @default(SKIP)
+  totalRows         Int
+  processedRows     Int               @default(0)
+  createdCount      Int               @default(0)
+  updatedCount      Int               @default(0)
+  skippedCount      Int               @default(0)
+  failedCount       Int               @default(0)
+  error             String?
+  createdAt         DateTime          @default(now())
+  startedAt         DateTime?
+  completedAt       DateTime?
+  rows              ImportRow[]
+
+  @@index([uploadedById, createdAt])
+}
+
+model ImportRow {
+  id             String          @id @default(cuid())
+  batchId        String
+  batch          ImportBatch     @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  rowNumber      Int // spreadsheet row number (header = row 1)
+  raw            Json
+  status         ImportRowStatus @default(PENDING)
+  errors         Json?
+  leadId         String?
+  duplicateOfId  String?
+
+  @@unique([batchId, rowNumber])
+  @@index([batchId, status])
+}
+
+model SavedView {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  filters   Json
+  createdAt DateTime @default(now())
+
+  @@unique([userId, name])
+}
+
+// ───────────── Phase 06: distribution ─────────────
+
+enum ReassignmentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELED
+}
+
+model DistributionRule {
+  id              String            @id @default(cuid())
+  name            String            @unique
+  method          AssignmentMethod // ROUND_ROBIN, EQUAL_DISTRIBUTION, WORKLOAD_BASED, CAMPAIGN_BASED or LOCATION_BASED
+  isActive        Boolean           @default(true)
+  priority        Int               @default(100) // lower runs first; the first matching rule wins
+  // Which leads the rule applies to (empty = any)
+  campaignId      String?
+  sourceId        String?
+  minLeadPriority LeadPriority?
+  matchCities     String[]          @default([])
+  matchStates     String[]          @default([])
+  // Who may receive them
+  teamId          String?
+  agents          DistributionRuleAgent[]
+  // Limits (combined with each agent's own limits; the stricter one applies)
+  maxActiveLeads  Int?
+  dailyLimit      Int?
+  fallbackToAny   Boolean           @default(false) // location-based: use any eligible agent if nobody covers the location
+  cursorUserId    String? // round-robin position
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  archivedAt      DateTime?
+
+  @@index([isActive, priority])
+}
+
+model DistributionRuleAgent {
+  ruleId String
+  userId String
+  rule   DistributionRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@id([ruleId, userId])
+}
+
+// One row per applied run. The id comes from the page that rendered the Apply button,
+// so a double-click or retry can never apply the same run twice.
+model DistributionRun {
+  id          String   @id
+  actorId     String
+  mode        String // UNASSIGNED or ABSENT_OWNERS
+  assigned    Int
+  unallocated Int
+  summary     Json
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model ReassignmentRequest {
+  id           String             @id @default(cuid())
+  leadId       String
+  lead         Lead               @relation(fields: [leadId], references: [id])
+  fromUserId   String?
+  toUserId     String
+  toUser       User               @relation("ReqTarget", fields: [toUserId], references: [id])
+  requestedById String
+  requester    User               @relation("ReqRequester", fields: [requestedById], references: [id])
+  reason       String
+  status       ReassignmentStatus @default(PENDING)
+  // Set to the lead id while PENDING and cleared on decision: the unique index stops duplicate open requests.
+  pendingKey   String?            @unique
+  decidedById  String?
+  decidedAt    DateTime?
+  decisionNote String?
+  createdAt    DateTime           @default(now())
+
+  @@index([status, createdAt])
+  @@index([leadId])
+}
+
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+// ───────────── Phase 08: telephony ─────────────
+
+enum CallEventStatus {
+  RECEIVED
+  PROCESSED
+  IGNORED
+  FAILED
+}
+
+// Every provider webhook is stored first, exactly as received, then processed. The unique dedupeKey makes
+// replays and provider retries harmless, and FAILED events can be retried without asking the provider again.
+model CallEvent {
+  id             String          @id @default(cuid())
+  provider       String
+  providerCallId String?
+  eventType      String
+  dedupeKey      String          @unique
+  raw            Json
+  normalized     Json?
+  status         CallEventStatus @default(RECEIVED)
+  attempts       Int             @default(0)
+  note           String?
+  callId         String?
+  receivedAt     DateTime        @default(now())
+  processedAt    DateTime?
+
+  @@index([status, receivedAt])
+  @@index([providerCallId])
+  @@index([callId])
+}
+
+// ───────────── Phase 09–11 additions ─────────────
+
+enum AnalysisStatus {
+  PENDING_REVIEW
+  ACCEPTED
+  REJECTED
+}
+
+// One row per (rule, event). The unique dedupeKey is what stops the same follow-up/lead/day from notifying twice.
+model AutomationLog {
+  id         String   @id @default(cuid())
+  ruleId     String
+  dedupeKey  String   @unique
+  trigger    String
+  entityType String
+  entityId   String
+  status     String // CLAIMED, DONE, FAILED, SKIPPED
+  attempts   Int      @default(1)
+  result     Json?
+  error      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([ruleId, createdAt])
+  @@index([status, updatedAt])
+}
+
+model AttendanceBreak {
+  id           String     @id @default(cuid())
+  attendanceId String
+  attendance   Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  startedAt    DateTime   @default(now())
+  endedAt      DateTime?
+
+  @@index([attendanceId])
+}
+
+model CallTranscript {
+  id          String   @id @default(cuid())
+  callId      String   @unique
+  call        CallLog  @relation(fields: [callId], references: [id], onDelete: Cascade)
+  text        String
+  source      String // "manual" or a provider name
+  createdById String?
+  createdAt   DateTime @default(now())
+}
+
+// AI output is a suggestion for a human reviewer, never a decision.
+model CallAnalysis {
+  id           String         @id @default(cuid())
+  callId       String
+  call         CallLog        @relation(fields: [callId], references: [id], onDelete: Cascade)
+  kind         String // "SUMMARY"
+  result       Json
+  confidence   Float? // as reported by the model; indicative only
+  model        String
+  status       AnalysisStatus @default(PENDING_REVIEW)
+  requestedById String?
+  reviewedById String?
+  reviewedAt   DateTime?
+  createdAt    DateTime       @default(now())
+
+  @@index([callId, createdAt])
+}
