@@ -12,6 +12,7 @@ import type {
   AgentRow, DashboardData, FilterOptions, GroupRow, TeamRow,
 } from "@/types/dashboard";
 import { resolveScope } from "./scope-service";
+import { cacheGet, cacheSet, cacheDel } from "@/lib/redis";
 
 const CONVERTED_CALL: Prisma.LeadWhereInput = { calls: { some: { disposition: { key: "CONVERTED" } } } };
 
@@ -33,6 +34,18 @@ function callScopeSql(scope: DataScope): Prisma.Sql {
 
 export async function getDashboardData(user: AuthUser, f: DashboardFilters): Promise<DashboardData> {
   assertCan(user, "dashboard", "VIEW");
+  
+  // Try cache first
+  const cacheKey = `dashboard:metrics:${user.id}:${f.range.from.getTime()}-${f.range.to.getTime()}:${f.teamId ?? 'all'}:${f.campaignId ?? 'all'}`;
+  const cached = await cacheGet(cacheKey);
+  if (cached) {
+    try {
+      return JSON.parse(cached) as DashboardData;
+    } catch {
+      await cacheDel(cacheKey);
+    }
+  }
+  
   const scope = await resolveScope(user);
 
   const now = new Date();
@@ -236,7 +249,7 @@ export async function getDashboardData(user: AuthUser, f: DashboardFilters): Pro
   const missed = fu.get("MISSED") ?? 0;
   const overduePending = Math.min(fuOverdue, pendingTotal);
 
-  return {
+  const result: DashboardData = {
     kpis: [
       { key: "totalLeads", label: "Total leads", value: totalLeads, basis: "snapshot" },
       { key: "newToday", label: "New leads today", value: newToday, basis: "snapshot" },
@@ -277,6 +290,11 @@ export async function getDashboardData(user: AuthUser, f: DashboardFilters): Pro
       notifications: notifications.map((n) => ({ id: n.id, title: n.title, at: n.createdAt, read: !!n.readAt })),
     },
   };
+  
+  // Cache result for 2 minutes (120 seconds)
+  await cacheSet(cacheKey, JSON.stringify(result), 120);
+  
+  return result;
 }
 
 /** Team/campaign choices limited to what the user is allowed to see. */

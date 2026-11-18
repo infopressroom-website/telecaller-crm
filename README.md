@@ -227,6 +227,14 @@ npm run verify       # Run all checks + build
 - Scheduler integration
 - Activity logs
 
+#### ⚡ Performance & Caching
+- **Redis caching** for dashboard and reports (optional)
+- Automatic fallback to in-memory cache
+- 2-minute cache for dashboard metrics
+- 5-minute cache for report results
+- Graceful degradation when Redis unavailable
+- Health check endpoint at `/api/health`
+
 #### 👨‍💼 Team Management
 - Team hierarchy
 - Member management

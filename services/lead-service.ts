@@ -13,6 +13,7 @@ import { nextLeadCodes } from "./lead-code";
 import { getDistributionSettings } from "./settings-service";
 import { getAccessibleLead, resolveScope } from "./scope-service";
 import type { LeadStatusValue } from "@/lib/leads/fields";
+import { cacheGet, cacheSet, cacheDelPattern } from "@/lib/redis";
 
 const ASSIGNABLE_ROLES = ["TELECALLER", "TEAM_LEADER"];
 
@@ -23,20 +24,36 @@ export async function listLeads(user: AuthUser, q: LeadListQuery) {
   const scope = await resolveScope(user);
   const { unworkedAfterHours } = await getDistributionSettings();
   const where = buildLeadWhere(scope, q, new Date(), new Date(Date.now() - unworkedAfterHours * 3_600_000));
-  const [total, rows] = await Promise.all([
-    db.lead.count({ where }),
-    db.lead.findMany({
-      where,
-      orderBy: LEAD_ORDER[q.sort],
-      ...toPrismaPage(q),
-      select: {
-        id: true, leadCode: true, name: true, primaryMobile: true, city: true, status: true, priority: true,
-        nextFollowUpAt: true, createdAt: true,
-        owner: { select: { name: true } }, team: { select: { name: true } },
-        source: { select: { name: true } }, campaign: { select: { name: true } },
-      },
-    }),
-  ]);
+  
+  // Cache lead counts for 1 minute (60 seconds)
+  const countCacheKey = `leads:counts:${user.id}:${JSON.stringify(where).slice(0, 100)}`;
+  let total: number;
+  
+  const cachedCount = await cacheGet(countCacheKey);
+  if (cachedCount) {
+    try {
+      total = JSON.parse(cachedCount) as number;
+    } catch {
+      total = await db.lead.count({ where });
+      await cacheSet(countCacheKey, JSON.stringify(total), 60);
+    }
+  } else {
+    total = await db.lead.count({ where });
+    await cacheSet(countCacheKey, JSON.stringify(total), 60);
+  }
+  
+  const rows = await db.lead.findMany({
+    where,
+    orderBy: LEAD_ORDER[q.sort],
+    ...toPrismaPage(q),
+    select: {
+      id: true, leadCode: true, name: true, primaryMobile: true, city: true, status: true, priority: true,
+      nextFollowUpAt: true, createdAt: true,
+      owner: { select: { name: true } }, team: { select: { name: true } },
+      source: { select: { name: true } }, campaign: { select: { name: true } },
+    },
+  });
+  
   return { rows, total, meta: pageMeta(total, q) };
 }
 
@@ -161,6 +178,10 @@ export async function createLead(user: AuthUser, input: LeadInput, confirmDuplic
     await tx.leadActivity.create({ data: { leadId: id, type: "CREATED", actorId: user.id, message: confirmDuplicate ? "Created (duplicate mobile confirmed)" : null } });
   });
   await audit({ actorId: user.id, action: "lead.create", entityType: "Lead", entityId: id });
+  
+  // Invalidate lead count caches
+  await cacheDelPattern("leads:counts:*");
+  
   return { ok: true, id };
 }
 
@@ -191,6 +212,9 @@ export async function updateLead(user: AuthUser, id: string, input: LeadInput) {
     db.lead.update({ where: { id }, data: next as Prisma.LeadUncheckedUpdateInput }),
     db.leadActivity.create({ data: { leadId: id, type: "UPDATED", actorId: user.id, data: { changes } as Prisma.InputJsonValue } }),
   ]);
+  
+  // Invalidate lead count caches
+  await cacheDelPattern("leads:counts:*");
 }
 
 export async function changeStatus(user: AuthUser, id: string, status: LeadStatusValue) {
@@ -201,6 +225,9 @@ export async function changeStatus(user: AuthUser, id: string, status: LeadStatu
     db.lead.update({ where: { id }, data: { status } }),
     db.leadActivity.create({ data: { leadId: id, type: "STATUS_CHANGED", actorId: user.id, data: { from: lead.status, to: status } } }),
   ]);
+  
+  // Invalidate lead count caches
+  await cacheDelPattern("leads:counts:*");
 }
 
 export async function addNote(user: AuthUser, id: string, message: string) {

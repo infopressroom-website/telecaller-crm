@@ -14,6 +14,7 @@ import { startProviderCall } from "./call-service";
 import { getLeadDetail } from "./lead-service";
 import { getActiveTelephony } from "./telephony-settings-service";
 import { getAccessibleLead } from "./scope-service";
+import { cacheDelPattern } from "@/lib/redis";
 
 const FINAL = ["CONVERTED", "LOST", "INVALID", "DND"] as const;
 const OPEN_CALL_STATUSES = ["INITIATED", "RINGING", "IN_PROGRESS"] as const;
@@ -213,7 +214,14 @@ export async function completeCall(user: AuthUser, input: SaveCallInput) {
     }, { timeout: 15_000 });
 
   try {
-    return await run();
+    const result = await run();
+    
+    // Invalidate dashboard cache after completing a call
+    if (!result.alreadySaved) {
+      await cacheDelPattern("dashboard:*");
+    }
+    
+    return result;
   } catch (e) {
     // Two identical submissions raced to create the same call: the loser just reports the winner's result.
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
