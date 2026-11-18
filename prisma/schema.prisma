@@ -331,6 +331,7 @@ model Lead {
   state          String?
   status         LeadStatus   @default(NEW)
   priority       LeadPriority @default(MEDIUM)
+  score          Int?         // Lead score 0-100, calculated automatically
   sourceId       String?
   source         LeadSource?  @relation(fields: [sourceId], references: [id])
   campaignId     String?
