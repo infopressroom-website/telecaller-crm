@@ -1,0 +1,66 @@
+# VERCEL ENVIRONMENT VARIABLES
+# Add these at: https://vercel.com/infopressroomin-3268/telecaller-crm/settings/environment-variables
+
+═══════════════════════════════════════════════════════════════════
+
+VARIABLE 1: DATABASE_URL
+═══════════════════════════════════════════════════════════════════
+
+Name:
+DATABASE_URL
+
+Value:
+postgresql://authenticator:npg_LF1XpaWK5ADk@ep-little-shadow-azj0b69n-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+
+Environment: Production ✓
+
+═══════════════════════════════════════════════════════════════════
+
+VARIABLE 2: NEXTAUTH_SECRET
+═══════════════════════════════════════════════════════════════════
+
+Name:
+NEXTAUTH_SECRET
+
+Value:
+5VJWiRSlrP4UxEN/dQ2vPzneqHQ2H8SOnohaPs+xNao=
+
+Environment: Production ✓
+
+═══════════════════════════════════════════════════════════════════
+
+VARIABLE 3: NEXTAUTH_URL
+═══════════════════════════════════════════════════════════════════
+
+Name:
+NEXTAUTH_URL
+
+Value:
+https://telecaller-crm-iota.vercel.app
+
+Environment: Production ✓
+
+═══════════════════════════════════════════════════════════════════
+
+VARIABLE 4: AUTH_SECRET
+═══════════════════════════════════════════════════════════════════
+
+Name:
+AUTH_SECRET
+
+Value:
+5VJWiRSlrP4UxEN/dQ2vPzneqHQ2H8SOnohaPs+xNao=
+
+Environment: Production ✓
+
+═══════════════════════════════════════════════════════════════════
+
+INSTRUCTIONS:
+1. Go to: https://vercel.com/infopressroomin-3268/telecaller-crm/settings/environment-variables
+2. Click "Add New" button
+3. Copy-paste each variable's Name and Value
+4. Select "Production" for environment
+5. Click "Save"
+6. Repeat for all 3 variables
+
+═══════════════════════════════════════════════════════════════════
