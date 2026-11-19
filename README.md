@@ -289,7 +289,17 @@ npm run verify       # Run all checks + build
 #### 🔔 Notifications
 - In-app notifications
 - Email notifications (when configured)
-- Real-time updates (when WebSocket configured)
+- Real-time updates via Pusher (optional)
+- Toast notifications for instant feedback
+- Notification bell with unread count
+
+#### ⚡ Real-time Features (Optional)
+- **Pusher integration** for WebSocket communication
+- Live notification updates
+- Real-time notification count
+- Automatic UI refresh on new notifications
+- Graceful degradation when not configured
+- Private channel authentication
 
 ---
 
@@ -358,6 +368,78 @@ npm run verify       # Run all checks + build
 - **Vitest** - Unit testing
 - **TypeScript** - Type checking
 - **Prisma Studio** - Database GUI
+
+---
+
+## ⚙️ Optional Services Configuration
+
+The application gracefully handles missing optional services. All features work without them, but enabling them provides enhanced functionality.
+
+### Redis (Caching)
+Improves dashboard and report performance:
+
+```bash
+# Install Redis locally
+# On macOS: brew install redis
+# On Ubuntu: sudo apt install redis-server
+# On Windows: Use WSL2 or Docker
+
+# Add to .env
+REDIS_URL="redis://localhost:6379"
+```
+
+### Pusher (Real-time Notifications)
+Enables live notification updates without page refresh:
+
+1. **Sign up** at [pusher.com](https://pusher.com) (free tier available)
+2. **Create a new app** in Pusher dashboard
+3. **Get credentials** from "App Keys" section
+4. **Add to .env:**
+
+```bash
+# Server credentials
+PUSHER_APP_ID="your-app-id"
+PUSHER_KEY="your-key"
+PUSHER_SECRET="your-secret"
+PUSHER_CLUSTER="your-cluster"  # e.g., "ap2" for Asia Pacific
+
+# Client credentials (must match server)
+NEXT_PUBLIC_PUSHER_KEY="your-key"
+NEXT_PUBLIC_PUSHER_CLUSTER="your-cluster"
+```
+
+5. **Restart the application** - Pusher status will appear in console and `/api/health`
+
+**Features enabled:**
+- ✅ Instant notification delivery
+- ✅ Real-time notification count updates
+- ✅ Toast notifications for new alerts
+- ✅ Auto-refresh notification list
+
+**Without Pusher:**
+- ✅ Notifications still work (page refresh required)
+- ✅ No errors or degradation
+- ✅ All other features unaffected
+
+### Email (Resend)
+For email notifications:
+
+```bash
+RESEND_API_KEY="re_..."
+EMAIL_FROM="noreply@yourdomain.com"
+```
+
+### Telephony (Exotel)
+For call integration:
+
+```bash
+TELEPHONY_PROVIDER="exotel"
+EXOTEL_ACCOUNT_SID="..."
+EXOTEL_API_KEY="..."
+EXOTEL_API_TOKEN="..."
+```
+
+See **[docs/TELEPHONY.md](docs/TELEPHONY.md)** for complete telephony setup.
 
 ---
 

@@ -1,5 +1,5 @@
 import { logoutAction } from "@/app/actions/auth";
-import { AppShell } from "@/components/layout/app-shell";
+import { AppShellWrapper } from "@/components/layout/app-shell-wrapper";
 import { requireUser } from "@/lib/auth/session";
 import { unreadCount } from "@/services/notification-service";
 
@@ -9,14 +9,14 @@ export const dynamic = "force-dynamic";
 export default async function SharedLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   return (
-    <AppShell
+    <AppShellWrapper
       variant={user.roleKey === "TELECALLER" ? "telecaller" : "admin"}
-      user={{ name: user.name, roleName: user.roleName }}
+      user={{ id: user.id, name: user.name, roleName: user.roleName }}
       permissions={[...user.permissions]}
       logoutAction={logoutAction}
-      unread={await unreadCount(user.id)}
+      initialUnread={await unreadCount(user.id)}
     >
       {children}
-    </AppShell>
+    </AppShellWrapper>
   );
 }
