@@ -2,7 +2,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { assertCan, type AuthUser } from "@/lib/auth/rbac";
-import { callScopeWhere, leadWhere } from "@/lib/auth/scope";
+import { callScopeWhere, followUpScopeWhere, leadWhere, type DataScope } from "@/lib/auth/scope";
 import type {
   AgentPerformance,
   AnalyticsFilters,
@@ -79,7 +79,7 @@ export async function getAnalyticsData(
     topAgents,
     trends,
   ] = await Promise.all([
-    getOverviewMetrics(leadFilter, callFilter, from, to),
+    getOverviewMetrics(leadFilter, callFilter, scope, from, to),
     getKPIComparisons(leadFilter, callFilter, from, to, previousFrom, previousTo),
     getFunnelAnalytics(leadFilter, from, to),
     getCallPatterns(callFilter, from, to),
@@ -113,12 +113,15 @@ export async function getAnalyticsData(
 async function getOverviewMetrics(
   leadFilter: Prisma.LeadWhereInput,
   callFilter: Prisma.CallLogWhereInput,
+  scope: DataScope,
   from: Date,
   to: Date
 ) {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const todayEnd = new Date(todayStart.getTime() + 86400000);
+
+  const followUpFilter = followUpScopeWhere(scope);
 
   const [totalLeads, convertedLeads, callsToday, activeFollowUps] = await Promise.all([
     db.lead.count({ where: { AND: [leadFilter, { createdAt: { gte: from, lt: to } }] } }),
@@ -138,8 +141,11 @@ async function getOverviewMetrics(
     }),
     db.followUp.count({
       where: {
-        status: "PENDING",
-        dueAt: { lte: now },
+        AND: [
+          followUpFilter,
+          { status: "PENDING" },
+          { dueAt: { lte: now } },
+        ],
       },
     }),
   ]);
