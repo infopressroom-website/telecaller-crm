@@ -232,6 +232,7 @@ model User {
   reqRequested    ReassignmentRequest[] @relation("ReqRequester")
   reqReceived     ReassignmentRequest[] @relation("ReqTarget")
   automationRules AutomationRule[]
+  whatsappMessages WhatsAppMessage[]
 
   @@index([roleId])
   @@index([teamId])
@@ -357,6 +358,7 @@ model Lead {
   tasks       Task[]
   activities  LeadActivity[]
   reassignRequests ReassignmentRequest[]
+  whatsappMessages WhatsAppMessage[]
 
   // Duplicate detection is a business decision (update/merge/keep), so mobile is NOT unique.
   @@index([primaryMobile])
@@ -666,6 +668,7 @@ enum LeadActivityType {
   NOTE
   MERGED
   IMPORTED
+  WHATSAPP_MESSAGE
 }
 
 enum ImportStatus {
@@ -894,6 +897,50 @@ enum AnalysisStatus {
   REJECTED
 }
 
+// ───────────── WhatsApp Integration ─────────────
+
+enum WhatsAppMessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum WhatsAppMessageType {
+  TEXT
+  TEMPLATE
+  IMAGE
+  DOCUMENT
+  LOCATION
+  REACTION
+}
+
+enum WhatsAppMessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum WhatsAppTemplateStatus {
+  APPROVED
+  PENDING
+  REJECTED
+  DELETED
+}
+
+enum WhatsAppTemplateCategory {
+  MARKETING
+  UTILITY
+  AUTHENTICATION
+}
+
+enum WhatsAppWebhookStatus {
+  RECEIVED
+  PROCESSED
+  IGNORED
+  FAILED
+}
+
 // One row per (rule, event). The unique dedupeKey is what stops the same follow-up/lead/day from notifying twice.
 model AutomationLog {
   id         String   @id @default(cuid())
@@ -949,4 +996,66 @@ model CallAnalysis {
   createdAt    DateTime       @default(now())
 
   @@index([callId, createdAt])
+}
+
+// ───────────── WhatsApp models ─────────────
+
+model WhatsAppMessage {
+  id             String                      @id @default(cuid())
+  leadId         String
+  lead           Lead                        @relation(fields: [leadId], references: [id])
+  agentId        String?
+  agent          User?                       @relation(fields: [agentId], references: [id])
+  direction      WhatsAppMessageDirection
+  messageType    WhatsAppMessageType
+  content        String?
+  status         WhatsAppMessageStatus       @default(PENDING)
+  externalId     String?
+  templateName   String?
+  templateParams Json?
+  mediaUrl       String?
+  mediaId        String?
+  metadata       Json?
+  failureReason  String?
+  dedupeKey      String?                     @unique
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+
+  @@index([leadId, createdAt])
+  @@index([status, createdAt])
+  @@index([externalId])
+  @@index([direction, status, createdAt(sort: Desc)])
+}
+
+model WhatsAppTemplate {
+  id          String                     @id @default(cuid())
+  externalId  String                     @unique
+  name        String
+  category    WhatsAppTemplateCategory
+  language    String
+  status      WhatsAppTemplateStatus
+  content     Json
+  variables   String[]
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+
+  @@unique([name, language])
+  @@index([status, category])
+}
+
+model WhatsAppWebhookEvent {
+  id           String                 @id @default(cuid())
+  dedupeKey    String                 @unique
+  eventType    String
+  raw          Json
+  normalized   Json?
+  status       WhatsAppWebhookStatus  @default(RECEIVED)
+  attempts     Int                    @default(0)
+  messageId    String?
+  note         String?
+  receivedAt   DateTime               @default(now())
+  processedAt  DateTime?
+
+  @@index([status, receivedAt])
+  @@index([eventType, status])
 }
