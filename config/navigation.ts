@@ -1,5 +1,5 @@
 import {
-  CalendarCheck, CalendarClock, FileBarChart, Headset, Home, LayoutDashboard, ListChecks,
+  BarChart3, CalendarCheck, CalendarClock, FileBarChart, Headset, Home, LayoutDashboard, ListChecks,
   PhoneCall, Settings, Shuffle, ShieldCheck, TrendingUp, Users, UsersRound, Zap, type LucideIcon,
 } from "lucide-react";
 
@@ -15,6 +15,7 @@ export type NavItem = {
 
 export const ADMIN_NAV: NavItem[] = [
   { label: "Dashboard", resource: "dashboard", href: "/dashboard", icon: LayoutDashboard, ready: true },
+  { label: "Analytics", resource: "analytics", href: "/analytics", icon: BarChart3, ready: true },
   { label: "Leads", resource: "lead", href: "/leads", icon: Users, ready: true },
   { label: "Lead Distribution", resource: "distribution", href: "/distribution", icon: Shuffle, ready: true },
   { label: "Team & employees", resource: "user", href: "/team", icon: Headset, ready: true },

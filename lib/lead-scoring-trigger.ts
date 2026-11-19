@@ -14,7 +14,7 @@ export async function updateLeadScore(leadId: string): Promise<number> {
   const lead = await db.lead.findUnique({
     where: { id: leadId },
     include: {
-      callLogs: {
+      calls: {
         orderBy: { createdAt: "desc" },
         take: 20, // Last 20 calls for scoring
       },
@@ -33,15 +33,15 @@ export async function updateLeadScore(leadId: string): Promise<number> {
   }
 
   // Calculate new score
-  const score = calculateLeadScore(lead);
+  const scoreResult = calculateLeadScore(lead);
 
   // Save to database
   await db.lead.update({
     where: { id: leadId },
-    data: { score },
+    data: { score: scoreResult.total },
   });
 
-  return score;
+  return scoreResult.total;
 }
 
 /**

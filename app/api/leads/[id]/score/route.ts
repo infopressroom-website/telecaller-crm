@@ -23,7 +23,7 @@ export async function POST(
     const lead = await db.lead.findUnique({
       where: { id: leadId },
       include: {
-        callLogs: {
+        calls: {
           orderBy: { createdAt: 'desc' },
           take: 50 // Last 50 calls for calculation
         },
@@ -45,19 +45,19 @@ export async function POST(
     }
 
     // Calculate score
-    const scoreTotal = calculateLeadScore(lead);
+    const scoreResult = calculateLeadScore(lead);
 
     // Update lead with new score
     const updatedLead = await db.lead.update({
       where: { id: leadId },
       data: {
-        score: scoreTotal
+        score: scoreResult.total
       }
     });
 
     return NextResponse.json({
       success: true,
-      score: scoreTotal,
+      score: scoreResult,
       lead: updatedLead
     });
 
@@ -93,7 +93,7 @@ export async function GET(
     const lead = await db.lead.findUnique({
       where: { id: leadId },
       include: {
-        callLogs: {
+        calls: {
           orderBy: { createdAt: 'desc' },
           take: 50
         },
@@ -115,11 +115,11 @@ export async function GET(
     }
 
     // Calculate current score (even if not saved)
-    const scoreTotal = calculateLeadScore(lead);
+    const scoreResult = calculateLeadScore(lead);
 
     return NextResponse.json({
-      score: lead.score || scoreTotal,
-      calculated: scoreTotal,
+      score: lead.score || scoreResult.total,
+      calculated: scoreResult,
       lastUpdated: lead.updatedAt
     });
 

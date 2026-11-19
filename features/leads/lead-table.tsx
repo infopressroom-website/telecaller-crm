@@ -101,7 +101,7 @@ export function LeadTable({
                 </td>
                 <td className="whitespace-nowrap px-3 py-3">+{r.primaryMobile}</td>
                 <td className="px-3 py-3"><Badge tone={LEAD_STATUS_TONE[r.status] ?? "neutral"}>{STATUS_LABELS[r.status]}</Badge></td>
-                <td className="px-3 py-3"><LeadScoreBadge leadId={r.id} score={r.score} /></td>
+                <td className="px-3 py-3"><LeadScoreBadge leadId={r.id} initialScore={r.score} /></td>
                 <td className="px-3 py-3">{PRIORITY_LABELS[r.priority]}</td>
                 <td className="px-3 py-3">{r.owner ?? <span className="text-ink-muted">Unassigned</span>}{r.team && <div className="text-xs text-ink-muted">{r.team}</div>}</td>
                 <td className="px-3 py-3">{r.source ?? "—"}{r.campaign && <div className="text-xs text-ink-muted">{r.campaign}</div>}</td>

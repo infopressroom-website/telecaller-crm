@@ -19,6 +19,7 @@ export type Action = (typeof ACTIONS)[number];
 export const RESOURCES = [
   "dashboard", "lead", "distribution", "user", "team", "call", "followup", "task",
   "attendance", "performance", "incentive", "qa", "report", "automation", "settings", "audit",
+  "analytics",
 ] as const;
 export type Resource = (typeof RESOURCES)[number];
 
@@ -34,16 +35,16 @@ export const DEFAULT_ROLE_GRANTS: Record<RoleKey, Partial<Record<Resource, Actio
     distribution: ["VIEW", "EDIT", "ASSIGN", "APPROVE"], user: ["VIEW"], team: ["VIEW", "EDIT"],
     call: ["VIEW"], followup: ["VIEW", "EDIT"], task: ["VIEW", "CREATE", "EDIT"],
     attendance: ["VIEW"], performance: ["VIEW", "EDIT"], incentive: ["VIEW", "APPROVE"],
-    qa: ["VIEW"], report: ["VIEW", "EXPORT"],
+    qa: ["VIEW"], report: ["VIEW", "EXPORT"], analytics: ["VIEW", "EXPORT"],
   },
   TEAM_LEADER: {
     dashboard: ["VIEW"], lead: ["VIEW", "EDIT", "ASSIGN"], distribution: ["VIEW"],
     team: ["VIEW"], call: ["VIEW"], followup: ["VIEW", "EDIT"], task: ["VIEW", "CREATE", "EDIT"],
-    attendance: ["VIEW"], performance: ["VIEW"], report: ["VIEW"],
+    attendance: ["VIEW"], performance: ["VIEW"], report: ["VIEW"], analytics: ["VIEW"],
   },
   QA_MANAGER: {
     dashboard: ["VIEW"], call: ["VIEW"], qa: ["VIEW", "CREATE", "EDIT", "MANAGE"],
-    performance: ["VIEW"], report: ["VIEW", "EXPORT"],
+    performance: ["VIEW"], report: ["VIEW", "EXPORT"], analytics: ["VIEW"],
   },
   HR_OPERATIONS: {
     dashboard: ["VIEW"], user: ["VIEW", "CREATE", "EDIT"], team: ["VIEW"], attendance: ["VIEW", "CREATE", "EDIT", "MANAGE"],
